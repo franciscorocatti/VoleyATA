@@ -1,0 +1,89 @@
+/* Permitir que las tarjetas y las grillas se ajusten al ancho de la pantalla. */
+.app,.card,.subtle,.stack,.field,.metric,.tablewrap,details,
+.grid-2>*,.live-grid>*,.lineup-grid>*,.mini-court>*,
+.section-head>*,.stats-actions>*,.row-between>* {min-width:0}
+.grid-2 {grid-template-columns:repeat(2,minmax(0,1fr))}
+.lineup-grid,.mini-court {grid-template-columns:repeat(3,minmax(0,1fr))}
+.score-main {grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}
+input,select {min-width:0;max-width:100%}
+input[type="checkbox"] {flex:0 0 18px}
+.tablewrap {width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
+.card,.subtle,.metric,.mini-zone,.history-row,.draft-tag,summary {overflow-wrap:anywhere}
+.mini-court {width:100%}
+.mini-zone strong {white-space:normal;overflow-wrap:anywhere}
+.roster-row {grid-template-columns:65px minmax(0,1fr) 36px}
+.roster-header {display:grid;grid-template-columns:65px minmax(0,1fr) 36px;gap:8px}
+.scores-sets {flex-wrap:wrap}
+.score-top {flex-wrap:wrap}
+.btn,.tab,.rally-btn,.outcome {white-space:normal;overflow-wrap:anywhere;max-width:100%}
+.stats-actions>.row {flex:1 1 340px;justify-content:flex-end;min-width:0}
+.stats-actions>.row>.btn {flex:1 1 130px}
+summary {line-height:1.5}
+
+@media(max-width:900px) {
+  .grid-2 {grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:620px) {
+  body {font-size:14px}
+  .app {width:100%;padding:14px 10px calc(30px + env(safe-area-inset-bottom))}
+  h1 {font-size:24px;overflow-wrap:anywhere}
+  h2 {font-size:18px}
+  .card {padding:14px;border-radius:12px}
+  .subtle {padding:11px}
+  .grid-2,.live-grid {grid-template-columns:minmax(0,1fr);gap:12px}
+  .stack {gap:12px}
+  .lineup-grid {grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+  .lineup-grid .field label {font-size:11px;min-height:32px;display:flex;align-items:flex-end}
+  .lineup-grid input,.lineup-grid select {padding:9px 4px}
+  /* Mantener adelante 4–3–2 y atrás 5–6–1, también en el teléfono. */
+  .mini-court {gap:5px}
+  .mini-zone {padding:10px 4px;font-size:12px}
+  input,select {font-size:16px;min-height:44px}
+  .btn,.btn-small {min-height:44px}
+  .row {gap:8px}
+  .row-between {gap:10px}
+  .section-head {align-items:flex-start;gap:8px}
+  .section-head>h2,.section-head>div {flex:1 1 180px}
+  .section-head>.btn {width:100%}
+  .card>.row:not(label) {align-items:stretch}
+  .card>.row:not(label)>.btn {flex:1 1 140px}
+  .card>.btn {width:100%;margin-top:8px}
+  .stats-actions {display:block}
+  .stats-actions>.row {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+  .stats-actions>.row>select {grid-column:1/-1;width:100%;max-width:none}
+  .stats-actions>.row>.btn {width:100%;padding:8px;font-size:12px}
+  .toolbar {gap:8px}
+  .tabs {grid-template-columns:repeat(4,minmax(0,1fr));width:100%;gap:3px}
+  .tab {min-width:0;min-height:44px;padding:8px 2px}
+  .stat-metrics {grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .metric {padding:12px}
+  .metric .label {font-size:11px}
+  .player-grid {gap:7px}
+  .player {padding:7px;gap:6px}
+  .jersey {flex-basis:28px;width:28px;height:31px}
+  .playername {font-size:12px;white-space:normal;overflow-wrap:anywhere}
+  .roster-row {grid-template-columns:52px minmax(0,1fr) 36px;gap:6px}
+  .roster-header {grid-template-columns:52px minmax(0,1fr) 36px;gap:6px}
+  .roster-row input {padding:9px 6px}
+  .scorecard {padding:15px 10px}
+  .score-top {gap:6px}
+  .score {font-size:46px}
+  .score-main {gap:6px}
+  .scores-sets {gap:4px}
+  .setchip {padding:5px 7px}
+  .rally-buttons {gap:8px}
+  .rally-btn {font-size:14px;min-height:68px}
+  .history-row {align-items:flex-start;padding:11px}
+  .history-row>.row {width:100%}
+  th,td {padding:10px 8px}
+  .footer {font-size:11px}
+}
+@media(max-width:360px) {
+  .app {padding-left:7px;padding-right:7px}
+  .card {padding:11px}
+  .brand {font-size:15px;gap:8px}
+  .brand-mark {width:31px;height:31px}
+  .skill-grid {gap:5px}
+  .skill {padding:10px 3px;font-size:11px}
+  .mini-zone {font-size:11px}
+}

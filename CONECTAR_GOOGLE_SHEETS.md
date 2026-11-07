@@ -23,6 +23,6 @@ Si se corta Internet, seguí cargando. Se conserva la copia local y se reintenta
 
 La conexión envía hasta 200 partidos locales por solicitud. No descarga partidos desde Sheets a otros dispositivos. Cargá cada partido desde un único dispositivo para evitar que una copia vieja reemplace otra. Eliminar un partido local no borra su copia en Google Sheets. Seguí exportando JSON para restaurar los partidos en la aplicación.
 
-Para publicar la página, subí `index.html`, `sheets-sync.js`, `team-management.js`, `formation-stats.js`, `sequence-stats.js`, `blocker-tracking.js`, `responsive.css` y esta guía al mismo directorio del sitio. El script `.gs` se pega en Google y no necesita publicarse con la web. Si modificás ese script, actualizá su implementación desde **Implementar → Gestionar implementaciones → Editar → Nueva versión**.
+Para publicar la página, subí `index.html`, `sheets-sync.js`, `team-management.js`, `saved-teams.js`, `formation-stats.js`, `sequence-stats.js`, `blocker-tracking.js`, `responsive.css` y esta guía al mismo directorio del sitio. El script `.gs` se pega en Google y no necesita publicarse con la web. Si modificás ese script, actualizá su implementación desde **Implementar → Gestionar implementaciones → Editar → Nueva versión**.
 
 Referencia de Google: https://developers.google.com/apps-script/guides/web

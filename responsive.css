@@ -24,6 +24,8 @@ input[type="checkbox"] {flex:0 0 18px}
 .stats-actions>.row {flex:1 1 340px;justify-content:flex-end;min-width:0}
 .stats-actions>.row>.btn {flex:1 1 130px}
 summary {line-height:1.5}
+.sheets-status-bar {display:flex;align-items:center;justify-content:center;gap:12px;flex-wrap:wrap;margin:16px 0;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.sheets-status-bar .btn {font-size:11px}
 
 @media(max-width:900px) {
   .grid-2 {grid-template-columns:minmax(0,1fr)}

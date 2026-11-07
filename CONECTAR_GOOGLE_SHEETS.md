@@ -1,28 +1,26 @@
-# Conectar Volley Scout con tu hoja
+# Conexión automática con Google Sheets
 
-Identificación de bloqueadores: publicá también `blocker-tracking.js` con la página. La versión actual de Apps Script agrega `Volley Bloqueos`, con atacante, bloqueador rival y si el bloqueo terminó en punto. Actualizá la implementación para guardar esos datos en Sheets; la URL y la clave se conservan.
+La página envía los datos a tu hoja automáticamente. No pide URL ni contraseña.
 
-Actualización de formaciones: publicá también `team-management.js` junto con la página. Reemplazá el código de Apps Script por la versión actual de `google-apps-script.gs` y publicá una nueva versión de la implementación, conservando URL y clave. Se agregan las pestañas `Volley Formaciones`, `Volley Cambios`, `Volley Liberos` y `Volley Rival`. Las pestañas anteriores se conservan. La formación rival incluye posición al registrar, posición actual y marcador de carga.
+## Activar la versión sin clave (una sola vez)
 
-Los datos se cargan en la página y se envían a la hoja que compartiste. Esta conexión queda pendiente hasta publicar el script y pegar su URL en la página.
+1. En tu hoja, abrí **Extensiones → Apps Script**.
+2. Reemplazá todo el código de **Código.gs** por el contenido completo de **google-apps-script.gs** y guardá.
+3. Elegí **Implementar → Gestionar implementaciones → Editar (lápiz)**.
+4. En Versión elegí **Nueva versión** y tocá **Implementar**. Conservá la implementación existente para mantener la misma URL.
+5. Subí a GitHub todos los archivos que están dentro de **para_github** y recargá la página.
+6. Creá un partido o cerrá un punto. El aviso al pie debe mostrar **Guardado confirmado**.
 
-1. Abrí tu hoja: https://docs.google.com/spreadsheets/d/1zzQpnoHHJNvNVTPdOyPkhcwftZUucV0tFPwxeYZdQpE/edit
-2. Entrá a **Extensiones → Apps Script**.
-3. Reemplazá el código inicial por todo el contenido de `google-apps-script.gs` y guardá.
-4. En **Configuración del proyecto → Propiedades de la secuencia de comandos**, agregá una propiedad llamada `VOLLEY_TOKEN`. Como valor, usá una clave privada aleatoria de al menos 24 caracteres. Guardala: vas a pegar la misma clave en la página. No la publiques ni la incluyas en el código.
-5. Elegí **Implementar → Nueva implementación → Aplicación web**. Configurá **Ejecutar como: Yo** y **Quién tiene acceso: Cualquier persona**. Autorizá el script para escribir en tu hoja. Si tu organización no permite esa opción, esta conexión requiere otro método de autenticación.
-6. Copiá la URL de la aplicación web que termina en `/exec`.
-7. Abrí la página actualizada. Desplegá **Google Sheets**, pegá la URL y la clave, y tocá **Guardar conexión y enviar**. Si todavía no hay partidos, creá uno.
-8. Esperá a ver **Guardado confirmado** y abrí la hoja: deberían aparecer `Volley Partidos`, `Volley Jugadores`, `Volley Sets` y `Volley Acciones`. El primer partido es la prueba real de la conexión; hasta entonces no está verificada.
+La propiedad antigua VOLLEY_TOKEN ya no se usa. El enlace de recepción permite enviar datos sin clave; la hoja conserva sus permisos de lectura existentes.
 
-Las pestañas se crean automáticamente en el primer envío. No hace falta preparar columnas ni publicar la hoja. La pestaña original se conserva. Las pestañas `Volley …` son administradas por la página: usá otras pestañas para fórmulas o análisis propios y mantené sus encabezados sin cambios.
+La implementación web debe seguir ejecutándose como su propietario y permitir acceso a Cualquier persona. Si tu organización no lo permite, este método necesita otra integración.
 
-Los cambios se envían a los 4 segundos del último guardado, agrupados para evitar un envío por cada clic. Las acciones se guardan al cerrar el rally. Deshacer un punto corrige también las filas de la hoja en el siguiente envío, sin duplicarlas. El botón **Enviar todos los partidos** permite volver a enviar las copias locales completas.
+## Durante el partido
 
-Si se corta Internet, seguí cargando. Se conserva la copia local y se reintenta al recuperar conexión, abrir la página o hacer un nuevo cambio. Si cerrás la página antes de la confirmación, volvé a abrirla para completar el envío. Si falla, revisá URL, clave, acceso público de la aplicación web y permisos del propietario. Un envío sin respuesta puede haberse guardado: reintentar actualiza los mismos partidos.
+Los cambios guardados se envían a los 4 segundos de la última modificación. Las acciones se guardan al cerrar el rally. Sin Internet se conserva la copia local y se reintenta al recuperar conexión o volver a abrir la página. También podés tocar **Reintentar envío** al pie. Un fallo nunca se muestra como guardado confirmado.
 
-La conexión envía hasta 200 partidos locales por solicitud. No descarga partidos desde Sheets a otros dispositivos. Cargá cada partido desde un único dispositivo para evitar que una copia vieja reemplace otra. Eliminar un partido local no borra su copia en Google Sheets. Seguí exportando JSON para restaurar los partidos en la aplicación.
+Eliminar un partido local no borra su copia en Sheets. El envío admite hasta 200 partidos por solicitud. Cargá cada partido desde un solo dispositivo. Seguí exportando la copia JSON completa para restaurar partidos y equipos guardados en otro dispositivo.
 
-Para publicar la página, subí `index.html`, `sheets-sync.js`, `team-management.js`, `saved-teams.js`, `formation-stats.js`, `sequence-stats.js`, `blocker-tracking.js`, `responsive.css` y esta guía al mismo directorio del sitio. El script `.gs` se pega en Google y no necesita publicarse con la web. Si modificás ese script, actualizá su implementación desde **Implementar → Gestionar implementaciones → Editar → Nueva versión**.
+El script administra Volley Partidos, Volley Jugadores, Volley Sets, Volley Acciones, Volley Formaciones, Volley Cambios, Volley Liberos, Volley Rival y Volley Bloqueos. No edites sus encabezados. Volley Resumen se conserva y recalcula sus porcentajes al llegar las acciones.
 
-Referencia de Google: https://developers.google.com/apps-script/guides/web
+Para publicar, subí todos los archivos de **para_github** a la misma carpeta de GitHub donde está index.html. El archivo google-apps-script.gs se pega en Google; no necesita publicarse con la web.

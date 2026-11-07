@@ -11,6 +11,32 @@ function teamSet(s) {
 function courtPlayers(s) {
   return s.positions.map(id => s.libero?.replacedId === id ? s.libero.playerId : id);
 }
+function captureCourtRotation(side) {
+  if (view !== 'live' || !document.querySelector || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return null;
+  const court = document.querySelector(`[data-court-side="${side}"]`);
+  if (!court) return null;
+  const origin = court.getBoundingClientRect(), players = new Map();
+  for (const node of court.querySelectorAll('[data-court-player]')) {
+    const rect = node.getBoundingClientRect();
+    players.set(node.dataset.courtPlayer,{x:rect.left-origin.left,y:rect.top-origin.top});
+  }
+  return {side,players};
+}
+function playCourtRotation(snapshot) {
+  if (!snapshot || !document.querySelector) return;
+  const court = document.querySelector(`[data-court-side="${snapshot.side}"]`);
+  if (!court) return;
+  const origin = court.getBoundingClientRect();
+  for (const node of court.querySelectorAll('[data-court-player]')) {
+    if (!node.animate) continue;
+    const before = snapshot.players.get(node.dataset.courtPlayer), rect = node.getBoundingClientRect();
+    const frames = before ? [
+      {transform:`translate(${before.x-(rect.left-origin.left)}px, ${before.y-(rect.top-origin.top)}px)`,backgroundColor:'#d6f5ec'},
+      {transform:'translate(0, 0)'}
+    ] : [{opacity:0,transform:'scale(.85)'},{opacity:1,transform:'scale(1)'}];
+    node.animate(frames,{duration:650,easing:'cubic-bezier(.22,.7,.25,1)'});
+  }
+}
 function opponentFields(players, prefix, draft = false) {
   return `<div class="lineup-grid">${[4,3,2,5,6,1].map(pos => {
     const p = players?.[pos-1] || {};
@@ -36,9 +62,9 @@ function opponentFormationCard(m, live = false) {
   const s = activeSet(), lineup = s.opponentLineup;
   if (live) {
     if (!lineup) return `<div class="card" style="margin-top:16px"><div class="row-between"><h2 style="margin:0">Formación rival · ${esc(m.opponent)}</h2><button class="btn btn-small" data-action="view" data-view="settings">Cargar formación rival</button></div></div>`;
-    return `<div class="card" style="margin-top:16px"><div class="section-head"><h2>Cancha rival · ${esc(m.opponent)}</h2><span class="pill">R${lineup.rotation}</span></div><p class="hinttext" style="margin-bottom:12px">Vista desde el lado del rival · adelante 4–3–2, atrás 5–6–1.</p><div class="mini-court">${[4,3,2,5,6,1].map(pos => {
+    return `<div class="card" style="margin-top:16px"><div class="section-head"><h2>Cancha rival · ${esc(m.opponent)}</h2><span class="pill">R${lineup.rotation}</span></div><p class="hinttext" style="margin-bottom:12px">Vista desde el lado del rival · adelante 4–3–2, atrás 5–6–1.</p><div class="mini-court" data-court-side="them">${[4,3,2,5,6,1].map(pos => {
       const p = lineup.current[pos-1];
-      return `<div class="mini-zone"><span class="tiny">Posición ${pos}</span><strong style="display:block">#${esc(p.number)} ${esc(p.name)}</strong></div>`;
+      return `<div class="mini-zone" data-court-player="${esc(p.number)}"><span class="tiny">Posición ${pos}</span><strong style="display:block">#${esc(p.number)} ${esc(p.name)}</strong></div>`;
     }).join('')}</div></div>`;
   }
   const editable = !s.finished && !pending.length && (!lineup || s.rallies.length === lineup.recordedAtRally);

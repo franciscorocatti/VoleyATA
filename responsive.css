@@ -10,6 +10,11 @@ input[type="checkbox"] {flex:0 0 18px}
 .tablewrap {width:100%;max-width:100%;overflow-x:auto;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch}
 .card,.subtle,.metric,.mini-zone,.history-row,.draft-tag,summary {overflow-wrap:anywhere}
 .mini-court {width:100%}
+.live-court-grid {grid-template-columns:repeat(3,minmax(0,1fr));border-top:3px dashed #93b5af;padding-top:10px;isolation:isolate}
+.live-court-grid .player {flex-direction:column;justify-content:flex-start;text-align:center;min-height:100px}
+.live-court-grid .playername {white-space:normal;overflow-wrap:anywhere}
+.live-court-grid .jersey {flex:0 0 33px}
+[data-court-player] {position:relative}
 .mini-zone strong {white-space:normal;overflow-wrap:anywhere}
 .roster-row {grid-template-columns:65px minmax(0,1fr) 36px}
 .roster-header {display:grid;grid-template-columns:65px minmax(0,1fr) 36px;gap:8px}
@@ -59,6 +64,7 @@ summary {line-height:1.5}
   .metric {padding:12px}
   .metric .label {font-size:11px}
   .player-grid {gap:7px}
+  .live-court-grid {grid-template-columns:repeat(3,minmax(0,1fr))}
   .player {padding:7px;gap:6px}
   .jersey {flex-basis:28px;width:28px;height:31px}
   .playername {font-size:12px;white-space:normal;overflow-wrap:anywhere}

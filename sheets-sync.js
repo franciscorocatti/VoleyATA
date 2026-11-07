@@ -1,5 +1,5 @@
 'use strict';
-const SHEETS_DEFAULT_URL = 'https://script.google.com/macros/s/AKfycby694u9MysauPjttNvkBBUPeTPky9BSIOXgOyLZts-63IktIBkXekZaBk5bBNI6YO6o/exec';
+const SHEETS_DEFAULT_URL = 'https://script.google.com/macros/s/AKfycbxRAOMJWsZTT0r3vpHcQzUXpBgBJNHzImbtugmGBLlVRt2yZv6cuKLAyX1nGXTTiANZ/exec';
 const sheetsConfig = {url:SHEETS_DEFAULT_URL};
 // El enlace ya está configurado. Se retira la antigua clave guardada en el navegador.
 try { localStorage.removeItem('volley_sheets_config_v1'); } catch (_) {}

@@ -11,6 +11,10 @@ function teamSet(s) {
 function courtPlayers(s) {
   return s.positions.map(id => s.libero?.replacedId === id ? s.libero.playerId : id);
 }
+function mobileRallyDock(m,s) {
+  if (s.finished) return '';
+  return `<div class="mobile-rally-dock no-print"><div class="dock-context"><strong>Set ${s.number} · ${s.score.us}–${s.score.them}</strong><span role="status">${pending.length} ${pending.length === 1 ? 'acción cargada' : 'acciones cargadas'}</span></div><div class="rally-buttons"><button class="rally-btn us" data-action="finish-rally" data-winner="us">+ Punto · ${esc(m.team)}</button><button class="rally-btn them" data-action="finish-rally" data-winner="them">+ Punto · ${esc(m.opponent)}</button></div></div>`;
+}
 function captureCourtRotation(side) {
   if (view !== 'live' || !document.querySelector || window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches) return null;
   const court = document.querySelector(`[data-court-side="${side}"]`);
@@ -114,7 +118,7 @@ function teamChange(s, type, outgoing, incoming, position, before) {
   s.changes.push({id:uid(), timestamp:new Date().toISOString(), type, outgoing, incoming, position,
     score:{...s.score}, rallyCount:s.rallies.length, rotation:s.rotation, before});
 }
-function teamSnapshot(s) { return {positions:[...s.positions], libero:s.libero ? {...s.libero} : null}; }
+function teamSnapshot(s) { return {positions:[...s.positions], libero:s.libero ? {...s.libero} : null,serve:s.serve,rotation:s.rotation}; }
 function betweenRallies(s) {
   if (s.finished) { toast('El set ya está finalizado.'); return false; }
   if (pending.length) { toast('Cerrá el punto en curso o quitá sus acciones antes de hacer un cambio.'); return false; }
@@ -140,7 +144,7 @@ function changesCard(m) {
   const bench = m.players.filter(p => !p.isLibero && !s.positions.includes(p.id));
   const liberos = m.players.filter(p => p.isLibero);
   const disabled = s.finished || pending.length ? 'disabled' : '';
-  const labels = {substitution:'Sustitución', 'libero-in':'Entra líbero', 'libero-out':'Sale líbero', 'libero-switch':'Cambio de líbero', 'libero-auto-out':'Sale líbero · automático'};
+  const labels = {substitution:'Sustitución', 'libero-in':'Entra líbero', 'libero-out':'Sale líbero', 'libero-switch':'Cambio de líbero', 'libero-auto-out':'Sale líbero · automático','rotation-correction':'Corrección de rotación','serve-correction':'Corrección de servicio'};
   return `<div class="card"><div class="section-head"><h2>Cancha y cambios · Set ${s.number}</h2><span class="pill">${s.changes.filter(c => c.type === 'substitution').length} sustituciones</span></div>
   <div class="mini-court">${[4,3,2,5,6,1].map(pos => `<div class="mini-zone"><span class="tiny">Posición ${pos}</span><strong style="display:block">${esc(pname(m,current[pos-1]))}${playerById(m,current[pos-1])?.isLibero ? ' · L' : ''}</strong></div>`).join('')}</div>
   <h3 style="margin-top:18px">Sustitución</h3><div class="grid-2"><div class="field"><label for="sub-out">Sale</label><select id="sub-out" ${disabled}>${teamOptions(m.players.filter(p => s.positions.includes(p.id) && p.id !== s.libero?.replacedId))}</select></div><div class="field"><label for="sub-in">Entra desde el banco</label><select id="sub-in" ${disabled}>${teamOptions(bench)}</select></div></div>
@@ -149,7 +153,7 @@ function changesCard(m) {
   <h3 style="margin-top:20px">Líbero</h3>${s.libero ? `<p><strong>${esc(pname(m,s.libero.playerId))}</strong> está por ${esc(pname(m,s.libero.replacedId))}.</p><button class="btn" data-action="team-libero-out" ${disabled}>Retirar líbero y devolver al jugador</button>${liberos.length > 1 ? `<button class="btn" data-action="team-libero-switch" ${disabled}>Cambiar al otro líbero</button>` : ''}` : liberos.length ? `<div class="grid-2"><div class="field"><label for="libero-in">Líbero que entra</label><select id="libero-in" ${disabled}>${teamOptions(liberos)}</select></div><div class="field"><label for="libero-for">Reemplaza a</label><select id="libero-for" ${disabled}>${teamOptions(m.players.filter(p => [1,5,6].includes(s.positions.indexOf(p.id)+1) && !(s.positions.indexOf(p.id) === 0 && s.serve === 'us')))}</select></div></div><button class="btn btn-soft" data-action="team-libero-in" style="margin-top:10px" ${disabled}>Ingresar líbero</button>` : '<p>Designá los líberos en Plantel para habilitar sus ingresos.</p>'}
   <p class="hinttext">El líbero ocupa el lugar de un zaguero sin cambiar el orden de rotación. Sale automáticamente cuando corresponde pasar a la delantera o sacar. Sus acciones se atribuyen a su nombre. Este registro no valida todos los límites reglamentarios de sustituciones.</p>
   ${pending.length ? '<p class="errorbox">Hay acciones pendientes: cerrá el punto para habilitar cambios.</p>' : ''}
-  <details style="margin-top:14px"><summary>Historial de cambios (${s.changes.length})</summary><div class="history" style="margin-top:10px">${s.changes.length ? s.changes.slice().reverse().map(c => `<div class="history-row"><div><strong>${esc(labels[c.type] || c.type)}</strong><br><small>${esc(pname(m,c.outgoing))} → ${esc(pname(m,c.incoming))} · P${c.position}</small></div><span class="tag">${c.score.us}–${c.score.them} · R${c.rotation}</span></div>`).join('') : '<p>Sin cambios registrados en este set.</p>'}</div></details>
+  <details style="margin-top:14px"><summary>Historial de cambios (${s.changes.length})</summary><div class="history" style="margin-top:10px">${s.changes.length ? s.changes.slice().reverse().map(c => `<div class="history-row"><div><strong>${esc(labels[c.type] || c.type)}</strong><br><small>${c.description?esc(c.description):esc(pname(m,c.outgoing))+' → '+esc(pname(m,c.incoming))+' · P'+c.position}</small></div><span class="tag">${c.score.us}–${c.score.them} · R${c.rotation}</span></div>`).join('') : '<p>Sin cambios registrados en este set.</p>'}</div></details>
   <button class="btn btn-small" style="margin-top:10px" data-action="team-undo-change" ${disabled || (!s.changes.length || s.changes.at(-1).rallyCount !== s.rallies.length || s.changes.at(-1).type === 'libero-auto-out' ? 'disabled' : '')}>Deshacer último cambio</button>
   </div>`;
 }
@@ -186,9 +190,10 @@ function handleTeamAction(action) {
   } else if (action === 'team-undo-change') {
     const change = s.changes.at(-1);
     if (!change || change.rallyCount !== s.rallies.length || !change.before || change.type === 'libero-auto-out') { toast('Solo se puede deshacer un cambio anterior al próximo punto.'); return true; }
-    s.positions = [...change.before.positions]; s.libero = change.before.libero ? {...change.before.libero} : null; s.changes.pop();
+    s.positions = [...change.before.positions]; s.libero = change.before.libero ? {...change.before.libero} : null;
+    if(change.before.serve)s.serve=change.before.serve;if(change.before.rotation)s.rotation=change.before.rotation;s.changes.pop();
   } else return true;
-  selectedPlayerId = null; save(); render(); toast('Cambio guardado.'); return true;
+  save(); render(); toast('Cambio guardado.'); return true;
 }
 document.addEventListener('change', e => {
   const t = e.target;

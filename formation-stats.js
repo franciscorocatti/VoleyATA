@@ -1,15 +1,18 @@
 'use strict';
 // Cada punto se atribuye a los jugadores presentes antes de jugarlo, no al plantel actual.
 function formationPlayers(rally) {
-  if (!Array.isArray(rally.positions) || rally.positions.length !== 6) return null;
-  const ids = rally.positions.map(id => rally.liberoBefore?.replacedId === id ? rally.liberoBefore.playerId : id);
+  const positions=rally.positions || rally.formationBefore?.positions;
+  if (!Array.isArray(positions) || positions.length !== 6) return null;
+  const ids = positions.map(id => rally.liberoBefore?.replacedId === id ? rally.liberoBefore.playerId : id);
   return ids.every(id => typeof id === 'string' && id) && new Set(ids).size === 6 ? ids : null;
 }
 function formationCounter() {
-  return {played:0,won:0,lost:0,receiving:0,sideOut:0,serving:0,breakPoint:0,receptionPoint:0,serveDefensePoint:0};
+  return {played:0,won:0,lost:0,receiving:0,sideOut:0,serving:0,breakPoint:0,receptionPoint:0,serveDefensePoint:0,withActions:0,completeSequences:0};
 }
 function countFormationRally(counter, rally) {
   counter.played++;
+  if (rally.actions?.length) counter.withActions++;
+  if ((rally.sequenceComplete ?? rally.metadata?.sequenceComplete ?? rally.dataQuality?.complete) === true) counter.completeSequences++;
   const sequence = directPointSequence(rally);
   if (sequence === 'reception') counter.receptionPoint++;
   if (sequence === 'serveDefense') counter.serveDefensePoint++;
@@ -28,6 +31,7 @@ function getFormationStats(match, filter = 'all') {
   for (const set of match.sets) {
     if (filter !== 'all' && String(set.number) !== String(filter)) continue;
     for (const rally of set.rallies) {
+      if (rally.status === 'open') continue;
       const players = formationPlayers(rally);
       if (!players || !['us','them'].includes(rally.winner) || !['us','them'].includes(rally.serveBefore)) { skipped++; continue; }
       const key = JSON.stringify([...players].sort());
@@ -36,8 +40,9 @@ function getFormationStats(match, filter = 'all') {
       countFormationRally(group,rally);
       group.sets.add(set.number);
       // R1 de dos sets distintos puede tener otro orden; conservamos set y posiciones.
-      const rotationKey = JSON.stringify([set.number,rally.rotation,players]);
-      if (!group.rotations.has(rotationKey)) group.rotations.set(rotationKey,{...formationCounter(),setNo:set.number,rotation:rally.rotation,players:[...players]});
+      const rotation=rally.rotationBefore ?? rally.rotation;
+      const rotationKey = JSON.stringify([set.number,rotation,players]);
+      if (!group.rotations.has(rotationKey)) group.rotations.set(rotationKey,{...formationCounter(),setNo:set.number,rotation,players:[...players]});
       countFormationRally(group.rotations.get(rotationKey),rally);
     }
   }
@@ -55,12 +60,13 @@ function formationRate(wins,total) { return `${pct(wins,total)} <small>(${wins}/
 function renderFormationStats(match) {
   const {groups,skipped} = getFormationStats(match,statSet);
   const total = groups.reduce((n,g)=>n+g.played,0);
+  const complete=groups.reduce((n,g)=>n+g.completeSequences,0);
   const best = groups[0];
   const receiving = groups.flatMap(g => [...g.rotations.values()].map(r => ({...r,group:g}))).filter(r => r.receiving > 0)
     .sort((a,b)=>a.sideOut/a.receiving-b.sideOut/b.receiving||b.receiving-a.receiving||a.setNo-b.setNo||a.rotation-b.rotation);
   const hardest = receiving[0];
   return `<div class="card"><div class="section-head"><div><h2>Rendimiento por formación</h2><small>${groups.length} grupos de seis · ${total} puntos analizados · ${statSet === 'all' ? 'Todos los sets' : 'Set '+esc(statSet)}</small></div><button class="btn btn-small no-print" data-action="download-formations" ${groups.length ? '' : 'disabled'}>↓ CSV formaciones</button></div>
-  <p>Comparamos los seis jugadores que estuvieron en cancha en cada punto. Una rotación mantiene el mismo grupo; una sustitución o ingreso de líbero genera otro grupo.</p>
+  <p>Comparamos los seis jugadores que estuvieron en cancha en cada punto. Una rotación mantiene el mismo grupo; una sustitución o ingreso de líbero genera otro grupo.</p><p class="hinttext">Side-out y break-point incluyen todos los rallies con formación y servicio conocidos, aunque no tengan acciones. Secuencias de primer ataque: ${complete < total ? 'muestra parcial; ' : ''}${complete} de ${total} rallies marcados como completos.</p>
   ${skipped ? `<p class="errorbox">${skipped} puntos quedaron fuera porque su formación o servicio no están completos en el registro.</p>` : ''}
   ${!groups.length ? '<p class="subtle">Todavía no hay puntos para analizar en este filtro. Cerrá algunos puntos del partido para comparar las formaciones.</p>' : `
   <div class="grid-2" style="margin-bottom:16px"><div class="subtle"><h3>Mayor diferencia de puntos</h3><strong>${signedPoints(best.won-best.lost)} · ${best.won} ganados / ${best.lost} perdidos</strong><p class="hinttext">${esc(formationName(match,best.players))}</p><small>${best.played} puntos observados${best.played < 5 ? ' · muestra pequeña' : ''}</small></div>

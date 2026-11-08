@@ -1,4 +1,12 @@
-﻿# Conexión automática con Google Sheets · Volley Scout 2.0
+﻿# Conexión automática con Google Sheets · Volley Scout 2.1
+
+## Actualización 2.1
+
+Se conserva la URL vigente y el contrato 2. Si ya publicaste el Apps Script compatible con use/colocada, **no necesitás reemplazarlo por esta actualización**. La clasificación rotacional y su fuente se guardan en el registro JSON de **Volley Acciones V2**; el resumen anterior no cambia de columnas.
+
+Publicá todo el contenido actualizado de `para_github`, incluidos `manifest.webmanifest`, `service-worker.js`, el puente `sw.js`, los tres PNG, las tres hojas CSS y todos los scripts. La primera apertura debe realizarse con Internet. Una actualización posterior se aplica cuando no haya rally abierto y todas las pestañas estén listas. La app no promete sincronización con la ventana cerrada.
+
+Los pasos de Apps Script que siguen corresponden a la configuración inicial o a versiones anteriores que todavía no aceptan el detalle V2.
 
 La página sigue enviando los datos a la misma hoja, sin pedir URL ni contraseña. El marcador y las acciones pendientes se guardan en este navegador; Sheets recibe los rallies cerrados.
 
@@ -10,8 +18,8 @@ Antes de actualizar la web, descargá **Partidos → Descargar copia completa (.
 2. Reemplazá todo el contenido de **Código.gs** por el archivo completo **google-apps-script.gs** de esta versión y guardá.
 3. Entrá en **Implementar → Gestionar implementaciones → Editar (lápiz)**.
 4. En **Versión**, elegí **Nueva versión** y tocá **Implementar**. Usá la implementación existente para conservar la URL.
-5. En GitHub, subí **todo el contenido actualizado de para_github** a la carpeta donde está el `index.html` actual. Reemplazá los archivos del mismo nombre y agregá los nuevos. Incluí `sw.js`, las dos hojas CSS y todos los archivos JavaScript.
-6. Esperá que GitHub Pages termine de publicar y abrí la página con Internet. Recargala para cargar la versión 2.0.
+5. En GitHub, subí **todo el contenido actualizado de para_github** a la carpeta donde está el `index.html` actual. Reemplazá los archivos del mismo nombre y agregá los nuevos. Incluí `sw.js`, las tres hojas CSS y todos los archivos JavaScript.
+6. Esperá que GitHub Pages termine de publicar y abrí la página con Internet. Recargala para cargar la versión 2.1.
 7. Cerrá un punto de prueba o tocá **Reintentar envío**. El aviso debe decir **Guardado confirmado en la hoja**.
 
 La implementación web sigue ejecutándose como su propietario y permite acceso a **Cualquier persona**. La propiedad antigua `VOLLEY_TOKEN` no se usa. El enlace recibe datos sin clave; los permisos de lectura de la hoja siguen siendo los que configuraste.
@@ -84,3 +92,8 @@ Si no puede validar los datos o crear el respaldo, protege el original y ofrece 
 Actualizá la implementación existente con el `google-apps-script.gs` de esta entrega antes de usar los resultados nuevos en la web. Un script V2 anterior puede rechazarlos como resultado incompatible. No cambia la URL ni se agregan columnas a las pestañas existentes.
 
 En **Volley Acciones**, use y colocada punto conservan «Punto» para que las fórmulas actuales sumen sus kills; colocada sigue conserva «Continuidad». En **Volley Acciones V2**, los resultados `use_block_out`, `tip_kill` y `tip_continue` y los metadatos distinguen cada variante. El bloqueador involucrado en un use se guarda en el detalle V2, sin registrar un punto de bloqueo en **Volley Bloqueos**.
+
+
+## Entrenamientos — versión 2.2
+
+Para aceptar sesiones de entrenamiento, copiá el archivo `google-apps-script.gs` completo y publicá una nueva versión de la implementación actual, conservando su URL `/exec`. El cliente conserva los entrenamientos locales y pendientes hasta recibir `trainingContractVersion:1` y la confirmación exacta de ID/revisión. Las seis pestañas nuevas de entrenamiento son independientes de los partidos. Seguí `ACTUALIZAR_ENTRENAMIENTO.md` para el procedimiento completo.

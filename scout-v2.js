@@ -11,6 +11,8 @@ function initializeScout() {
   restoreScoutDraft();
 }
 function importScoutBackup(raw) {
+  try{const incoming=JSON.parse(raw);if(incoming.training||incoming.trainingSession){TrainingUI.importBackup(raw);return true;}}catch(_){}
+
   let object;try{object=JSON.parse(raw)}catch(_){toast('El archivo no contiene JSON válido.');return false;}
   const prepared=VolleyData.prepareImport(object,state);
   if(!prepared.ok){toast('La copia no tiene una estructura compatible. Los datos actuales no se modificaron.');return false;}
@@ -34,16 +36,16 @@ function restoreScoutDraft() {
   originZone=draft?.originZone??null;destinationZone=draft?.destinationZone??null;selectedZone=null;
   pointCause=draft?.pointCause||null;sequenceComplete=draft?.sequenceComplete===true;
   editingActionIndex=null;awaitingBlockerIndex=draft?.awaitingBlockerIndex??null;ownBlockers=draft?.ownBlockers||[];settingTarget=draft?.settingTarget||'';receiverId=draft?.receiverId||'';
-  useBlockerDraft={...(draft?.useBlockerDraft||{}),skill:'attack',outcomeId:'use_block_out'};
+  useBlockerDraft={...(draft?.useBlockerDraft||{}),skill:'attack',outcomeId:'use_block_out'};attackRoleOverride=draft?.attackRoleOverride||'auto';quickCausesOpen=false;
 }
 function persistScoutDraft() {
   const s=activeSet();if (!s) return;
   state.openRallies ||= {};
   state.openRallies[s.id]={id:openRallyId||uid(),actions:structuredCloneSafe(pending),mode:scoutMode,selectedPlayerId,selectedSkill,
-    originZone,destinationZone,pointCause,sequenceComplete,awaitingBlockerIndex,ownBlockers,settingTarget,receiverId,useBlockerDraft:structuredCloneSafe(useBlockerDraft)};
+    originZone,destinationZone,pointCause,sequenceComplete,awaitingBlockerIndex,ownBlockers,settingTarget,receiverId,attackRoleOverride,useBlockerDraft:structuredCloneSafe(useBlockerDraft)};
   state.preferences={...state.preferences,mode:scoutMode,autoClose:autoClosePoints};
 }
-function resetActionInputs() {originZone=null;destinationZone=null;selectedZone=null;ownBlockers=[];settingTarget='';receiverId='';useBlockerDraft={skill:'attack',outcomeId:'use_block_out'};editingActionIndex=null;zonePickerOpen=false;}
+function resetActionInputs() {attackRoleOverride='auto';originZone=null;destinationZone=null;selectedZone=null;ownBlockers=[];settingTarget='';receiverId='';useBlockerDraft={skill:'attack',outcomeId:'use_block_out'};editingActionIndex=null;zonePickerOpen=false;}
 function scoutActionLabel(action,rally) {
   const result=VolleyCatalog.outcome(action,rally);
   return (skills[action.skill]?.name||action.skill)+' · '+(result?.label||action.outcome)+(typeof blockerText==='function'?blockerText(action):'');
@@ -80,13 +82,13 @@ function renderPendingV2(m) {
 function renderScoutV2(m) {
   const s=activeSet(),wins=matchWinner(m),definition=VolleyCatalog.definitions[selectedSkill],ended=matchEnded(m);
   return `<section class="scout-v2"><header class="v2-live-head"><div class="v2-score"><div><span>${esc(m.team)}</span><strong>${s.score.us}</strong></div><span class="v2-score-sep">:</span><div><span>${esc(m.opponent)}</span><strong>${s.score.them}</strong></div><small>Set ${s.number} · ${wins.us}–${wins.them} sets<br>R${s.rotation} · ${s.finished?'Finalizado':s.serve==='us'?'Sacamos':'Recibimos'}</small></div><div class="v2-mode-controls"><div class="v2-mode-switch" role="group" aria-label="Modo de registro"><button class="${scoutMode==='quick'?'active':''}" data-action="v2-mode" data-mode="quick" aria-pressed="${scoutMode==='quick'}">Modo rápido</button><button class="${scoutMode==='advanced'?'active':''}" data-action="v2-mode" data-mode="advanced" aria-pressed="${scoutMode==='advanced'}">Modo avanzado</button></div><label class="v2-auto"><input type="checkbox" data-v2-field="autoClose" ${autoClosePoints?'checked':''}>Cierre automático</label></div></header>
-  ${s.finished?`<div class="callout v2-finished">Set finalizado. ${ended?'Partido terminado.':'Revisá la formación del próximo set.'}<div class="row">${!ended?'<button class="btn btn-primary" data-action="next-set">Siguiente set</button>':''}<button class="btn" data-action="undo-rally">Corregir último punto</button></div></div>`:''}
+  ${s.finished?`<div class="callout v2-finished">Set finalizado. ${ended?'Partido terminado.':'Revisá la formación del próximo set.'}<div class="row">${!ended?'<button class="btn btn-primary" data-action="next-set">Siguiente set</button>':''}<button class="btn" data-action="coach-open">Informe del entrenador</button><button class="btn" data-action="undo-rally">Corregir último punto</button></div></div>`:''}
   <div class="v2-console"><div class="card v2-player-card"><div class="section-head"><h2>Jugador</h2><button class="btn btn-small" data-action="view" data-view="settings">Cambios / líbero</button></div><div class="player-grid live-court-grid" data-court-side="us">${[4,3,2,5,6,1].map(pos=>{const id=courtPlayers(s)[pos-1],p=playerById(m,id);return `<button class="player ${selectedPlayerId===id?'selected':''} ${p?.isLibero?'is-libero':''}" data-action="select-player" data-player="${esc(id)}" data-court-player="${esc(id)}" aria-pressed="${selectedPlayerId===id}"><span class="jersey">${esc(p?.number||'?')}</span><span class="v2-player-copy"><span class="playername">${esc(p?.name||'Sin jugador')}</span><span class="playerpos">P${pos}${p?.isLibero?' · LÍBERO':''}</span></span></button>`}).join('')}</div><p class="hinttext">Red ↑ · posiciones 4–3–2 / 5–6–1</p></div>
   <div class="card v2-entry-card"><div class="v2-skills" role="group" aria-label="Fundamento">${Object.entries(VolleyCatalog.definitions).map(([key,value])=>`<button class="skill ${key===selectedSkill?'selected':''}" data-action="select-skill" data-skill="${key}" aria-pressed="${key===selectedSkill}">${scoutIcon(key)}<span>${value.name}</span></button>`).join('')}</div><div class="v2-selected"><strong>${selectedPlayerId?esc(pname(m,selectedPlayerId)):'Elegí un jugador'}</strong><small>${esc(definition.name)}${editingActionIndex!==null?' · editando acción '+(editingActionIndex+1):''}</small></div>
-  <div class="outcome-grid v2-outcomes">${definition.outcomes.map(out=>`<button class="outcome ${out.winner==='us'?'good':out.winner==='them'?'bad':'neutral'}" data-action="v2-result" data-result="${out.id}" ${s.finished?'disabled':''}><span aria-hidden="true">${out.winner==='us'?'✓':out.winner==='them'?'×':'↻'}</span>${out.label}</button>`).join('')}</div>
+  ${selectedSkill==='attack'?attackRoleControl():''}<div class="outcome-grid v2-outcomes">${definition.outcomes.map(out=>`<button class="outcome ${out.winner==='us'?'good':out.winner==='them'?'bad':'neutral'}" data-action="v2-result" data-result="${out.id}" ${s.finished?'disabled':''}><span aria-hidden="true">${out.winner==='us'?'✓':out.winner==='them'?'×':'↻'}</span>${out.label}</button>`).join('')}</div>
   ${editingActionIndex!==null?'<button class="btn btn-small" data-action="v2-edit-cancel">Cancelar edición</button>':''}${selectedSkill==='attack'?'<p class="hinttext">Toque / colocada: solo una acción ofensiva dirigida al campo rival.</p>':''}${renderScoutZones()}${renderScoutExtras(m,s)}<p class="hinttext">${scoutMode==='advanced'?'Las pelotas gratuitas no se registran como ataques. ':''}${autoClosePoints?'✓ / × cierran el punto automáticamente; ↻ continúa el rally.':'El cierre automático está desactivado. Usá los botones de punto.'}</p></div></div>
   ${renderPendingV2(m)}<details class="card v2-history"><summary>Últimos puntos · ${s.rallies.length} disputados</summary><div class="history">${s.rallies.slice(-8).reverse().map(r=>`<div class="history-row"><div><strong>${r.scoreBefore.us+(r.winner==='us'?1:0)}–${r.scoreBefore.them+(r.winner==='them'?1:0)} · ${esc(r.winner==='us'?m.team:m.opponent)}</strong><br><small>R${r.rotation} · ${r.mode==='advanced'?'Avanzado':r.mode==='quick'?'Rápido':'Registro anterior'} · ${r.actions.length?r.actions.map(a=>esc(scoutActionLabel(a,r))).join(' → '):esc(SCOUT_CAUSES[r.cause]||'Sin acción individual')}</small></div></div>`).join('')||'<p class="hinttext">Sin puntos todavía.</p>'}</div></details>
-  ${!s.finished?`<footer class="v2-point-dock no-print"><div class="v2-dock-top"><button class="btn btn-small" data-action="v2-smart-undo">↶ Deshacer</button><span>${pending.length?esc(scoutActionLabel(pending.at(-1))):'Sin acciones pendientes'}</span><button class="btn btn-small" data-action="v2-current-rally">Rally (${pending.length})</button></div><div class="rally-buttons"><button class="rally-btn us" data-action="finish-rally" data-winner="us">+ Punto · ${esc(m.team)}</button><button class="rally-btn them" data-action="finish-rally" data-winner="them">+ Punto · ${esc(m.opponent)}</button></div></footer>`:''}</section>`;
+  ${!s.finished?`<footer class="v2-point-dock no-print">${renderQuickCausePanel()}<div class="v2-dock-top"><button class="btn btn-small" data-action="v2-smart-undo">↶ Deshacer</button><span>${pending.length?esc(scoutActionLabel(pending.at(-1))):'Sin acciones pendientes'}</span><button class="btn btn-small" data-action="v2-current-rally">Rally (${pending.length})</button></div><div class="rally-buttons ${scoutMode==='quick'?'v21-with-causes':''}"><button class="rally-btn us" data-action="finish-rally" data-winner="us">+ Punto · ${esc(m.team)}</button><button class="rally-btn them" data-action="finish-rally" data-winner="them">+ Punto · ${esc(m.opponent)}</button>${scoutMode==='quick'?'<button class="btn v21-cause-toggle" data-action="v21-cause-toggle" aria-label="Cómo nos hicieron el punto">Con causa ▴</button>':''}</div></footer>`:''}</section>`;
 }
 function addScoutAction(result,input={}) {
   const now=Date.now();if (now-lastPointCommit<600||now-lastActionTap<260) return false;
@@ -98,7 +100,7 @@ function addScoutAction(result,input={}) {
   const useBlocker=result==='use_block_out'?useBlockerDraft:null;
   if(previous?.outcomeId==='use_block_out'||useBlocker)delete previousMetadata.rivalBlockers;
   const created=VolleyEngine.createAction({id:previous?.id,playerId:selectedPlayerId,skill:selectedSkill,outcomeId:result,
-    originZone,destinationZone,participants:ownBlockers,blocker:useBlocker?useBlocker.blocker:previous?.outcomeId==='use_block_out'?null:previous?.blocker,metadata:{...previousMetadata,...(useBlocker?{rivalBlockers:rivalBlockers(useBlocker)}:{}),settingTarget:settingTarget||null,receiverId:receiverId||null},...input},
+    originZone,destinationZone,attackRoleOverride,participants:ownBlockers,blocker:useBlocker?useBlocker.blocker:previous?.outcomeId==='use_block_out'?null:previous?.blocker,metadata:{...previousMetadata,...(useBlocker?{rivalBlockers:rivalBlockers(useBlocker)}:{}),settingTarget:settingTarget||null,receiverId:receiverId||null},...input},
     {match:m,set:s,actions:base,mode:scoutMode});
   if (created.error) {toast(created.error);return false;}
   if (edit!==null&&created.terminalWinner&&edit!==pending.length-1) {toast('Una acción terminal debe ser la última. Quitá primero las acciones posteriores.');return false;}
@@ -115,7 +117,10 @@ function commitScoutRally(winner,options={}) {
   const now=Date.now();if (now-lastPointCommit<600) return false;
   const m=activeMatch(),s=activeSet();if(!m||!s)return false;
   const motion=s.serve!==winner?captureCourtRotation(winner):null;
-  const result=VolleyEngine.closeRally(m,s,pending,{winner,id:openRallyId||uid(),mode:scoutMode,cause:pointCause,sequenceComplete,...options});
+  const terminal=VolleyEngine.terminalCause(pending);
+  // Una terminal corregida reemplaza la causa colectiva recuperada al deshacer.
+  const cause=options.automatic&&terminal&&pointCause&&!terminal.allowed.includes(pointCause)?terminal.preferred:pointCause;
+  const result=VolleyEngine.closeRally(m,s,pending,{winner,id:openRallyId||uid(),mode:scoutMode,cause,sequenceComplete,...options});
   if(result.error){toast(result.error);return false;}
   lastPointCommit=now;reconcileLibero(s);pending=[];awaitingBlockerIndex=null;openRallyId=uid();pointCause=null;sequenceComplete=false;resetActionInputs();
   const locallySaved=save();render();if(!s.finished)playCourtRotation(motion);
@@ -132,6 +137,7 @@ function undoScoutRally() {
   awaitingBlockerIndex=null;editingActionIndex=null;lastPointCommit=0;lastActionTap=0;const locallySaved=save();render();toast(locallySaved?'Punto deshecho. Corregí sus acciones antes de volver a cerrarlo.':'Corrección en memoria: descargá una copia.');return true;
 }
 function handleScoutAction(action,t) {
+  if(handleScoutV21Action(action,t))return true;
   if(action==='add-action'){addScoutAction(t.dataset.outcome);return true;}
   if(action==='v2-result'){addScoutAction(t.dataset.result);return true;}
   if(action==='finish-rally'){finishRally(t.dataset.winner);return true;}
@@ -140,7 +146,7 @@ function handleScoutAction(action,t) {
     selectedSkill=t.dataset.skill;resetActionInputs();save();render();return true;
   }
   if(action==='select-player'){
-    selectedPlayerId=t.dataset.player;save();render();return true;
+    selectedPlayerId=t.dataset.player;attackRoleOverride='auto';save();render();return true;
   }
   if(action==='toggle-zone'){zonePickerOpen=!zonePickerOpen;render();return true;}
   if(action==='select-zone'){
@@ -161,7 +167,7 @@ function handleScoutAction(action,t) {
     const index=+t.dataset.index,a=pending[index];if(!a)return true;
     editingActionIndex=index;selectedPlayerId=a.playerId;selectedSkill=a.skill;originZone=a.originZone??null;destinationZone=a.destinationZone??null;
     ownBlockers=(a.participants||[]).filter(id=>id!==a.playerId);settingTarget=a.metadata?.settingTarget||'';receiverId=a.metadata?.receiverId||'';awaitingBlockerIndex=null;
-    useBlockerDraft=a.outcomeId==='use_block_out'?structuredCloneSafe(a):{skill:'attack',outcomeId:'use_block_out'};render();
+    useBlockerDraft=a.outcomeId==='use_block_out'?structuredCloneSafe(a):{skill:'attack',outcomeId:'use_block_out'};attackRoleOverride=a.metadata?.attackRoleSource==='manual'?a.attackRole:'auto';render();
   }
   if(action==='v2-edit-cancel'){resetActionInputs();render();}
   if(action==='v2-confirm-block'){awaitingBlockerIndex=null;finishRally('them',{automatic:true});}

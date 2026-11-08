@@ -28,15 +28,16 @@ const VolleyEngine = (() => {
     if (actions.some(a=>VolleyCatalog.outcome(a)?.winner)) return {error:'Ya hay una acción terminal. Cerrá el punto o corregí esa acción antes de seguir.'};
     const definition=VolleyCatalog.find(input.skill,input.outcomeId||input.outcome);
     if (!definition) return {error:'El resultado no corresponde a este fundamento.'};
+    const repetition=set.training?.type==='repetitions';
     const player=match.players.find(p=>p.id===input.playerId);
     if (!player) return {error:'Elegí un jugador antes de registrar la acción.'};
     if (!onCourt(set).includes(player.id)) return {error:'Ese jugador no está en cancha. Registrá primero el cambio o elegí un jugador en cancha.'};
-    if(player.isLibero&&['serve','block'].includes(input.skill))return {error:'Con el criterio FIVB, el líbero no puede sacar ni bloquear. Revisá el jugador seleccionado.'};
-    if (input.skill==='serve'&&(set.serve!=='us'||actions.length)) return {error:'El saque solo se registra al comenzar un rally con servicio nuestro.'};
-    if (input.skill==='reception'&&(set.serve!=='them'||actions.some(a=>['serve','reception','attack','defense'].includes(a.skill)))) return {error:'La recepción corresponde al primer contacto de un saque rival. Para una pelota en juego usá Defensa.'};
+    if(!repetition&&player.isLibero&&['serve','block'].includes(input.skill))return {error:'Con el criterio FIVB, el líbero no puede sacar ni bloquear. Revisá el jugador seleccionado.'};
+    if (!repetition&&input.skill==='serve'&&(set.serve!=='us'||actions.length)) return {error:'El saque solo se registra al comenzar un rally con servicio nuestro.'};
+    if (!repetition&&input.skill==='reception'&&(set.serve!=='them'||actions.some(a=>['serve','reception','attack','defense'].includes(a.skill)))) return {error:'La recepción corresponde al primer contacto de un saque rival. Para una pelota en juego usá Defensa.'};
     const participants=[...new Set([player.id,...(input.skill==='block'?(input.participants||[]):[])])];
     if (participants.length>3||participants.some(p=>!onCourt(set).includes(p)||!match.players.some(x=>x.id===p))) return {error:'Elegí hasta tres bloqueadores que estén en cancha.'};
-    if(input.skill==='block'&&participants.some(id=>match.players.find(p=>p.id===id)?.isLibero))return {error:'El líbero no puede participar del bloqueo.'};
+    if(!repetition&&input.skill==='block'&&participants.some(id=>match.players.find(p=>p.id===id)?.isLibero))return {error:'El líbero no puede participar del bloqueo.'};
     const metadata={...(input.metadata||{})};
     if(input.skill==='attack') {
       if(['use_block_out','tip_kill','tip_continue'].includes(definition.id)) {
@@ -60,19 +61,37 @@ const VolleyEngine = (() => {
       outcome:definition.legacy,originZone,destinationZone,zone:['serve','attack'].includes(input.skill)?destinationZone:originZone,
       order:actions.length+1,timestamp:new Date().toISOString(),mode,metadata};
     if (input.blocker?.number) action.blocker=clone(input.blocker);
-    return {action,terminalWinner:definition.winner};
+    if(input.skill==='attack'&&typeof VolleyPosition!=='undefined'){
+      const position=set.training?.rotations===false?{role:'unknown',position:null,source:'training-no-rotation'}:VolleyPosition.forPlayer(player.id,{positions:[...set.positions],libero:clone(set.libero||null)});
+      const manual=['front','back','unknown'].includes(input.attackRoleOverride);
+      action.attackRole=set.training?.rotations===false?'unknown':manual?input.attackRoleOverride:position.role;
+      action.rotationalPosition=position.position;
+      metadata.attackRoleSource=manual?'manual':position.source;
+      metadata.computedAttackRole=position.role;
+    }
+    return {action,terminalWinner:repetition?null:definition.winner};
   }
   function terminalWinner(actions) {
     return actions.reduce((winner,a)=>VolleyCatalog.outcome(a)?.winner||winner,null);
   }
+  function terminalCause(actions){
+    const action=actions.at(-1),result=action&&VolleyCatalog.outcome(action);
+    if(!result?.winner)return null;
+    const allowed=result.winner==='us'?[]:action.skill==='attack'&&result.id==='blocked_point'?['opponent_block']:action.skill==='reception'?['opponent_serve','own_error']:['own_error'];
+    return {winner:result.winner,allowed,preferred:allowed[0]||null};
+  }
   function closeRally(match,set,actions,options={}) {
     if (!set||set.finished) return {error:'El set ya está cerrado.'};
+    if(set.training?.type==='repetitions')return {error:'Las repeticiones no generan puntos.'};
     const winner=options.winner;
     if (!['us','them'].includes(winner)) return {error:'Elegí el ganador del punto.'};
     if (options.id&&set.rallies.some(r=>r.id===options.id)) return {error:'Este punto ya está guardado.',duplicate:true};
     const terminals=actions.map((a,i)=>({i,winner:VolleyCatalog.outcome(a)?.winner})).filter(x=>x.winner);
     if (terminals.length>1||terminals.some(t=>t.i!==actions.length-1)) return {error:'Hay una acción terminal antes del final de la secuencia. Corregila antes de cerrar.'};
     if (terminals.length&&terminals[0].winner!==winner) return {error:'El ganador no coincide con la última acción. Editá o quitá esa acción antes de cerrar el punto.'};
+    const terminal=terminalCause(actions),cause=options.cause||null;
+    if(cause==='opponent_serve'&&set.serve!=='them')return {error:'Un ace rival corresponde a un rally que comenzó con saque rival. Revisá la causa o el servicio.'};
+    if(terminal&&cause&&cause!=='unknown'&&!terminal.allowed.includes(cause))return {error:'La causa no coincide con la acción terminal. Corregí la acción o elegí una causa compatible.'};
     if (actions.some(a=>!match.players.some(p=>p.id===a.playerId))) return {error:'Hay una acción atribuida a un jugador inexistente.'};
     for(let i=0;i<actions.length;i++){
       const action=actions[i],previous=actions.slice(0,i);
@@ -87,17 +106,18 @@ const VolleyEngine = (() => {
       timestamp:new Date().toISOString(),winner,serveBefore:before.serve,rotation:before.rotation,positions:[...before.positions],
       scoreBefore:clone(before.score),liberoBefore:clone(before.libero),opponentBefore:clone(before.opponentLineup),
       changeCount:before.changes.length,before,actions:clone(actions),mode:options.mode||'quick',
-      sequenceComplete:options.sequenceComplete===true,cause:options.cause||null,metadata:{closedVia:options.automatic?'automatic':'manual'}};
+      sequenceComplete:options.sequenceComplete===true,cause:cause==='unknown'&&terminal?terminal.preferred:cause,metadata:{...(options.metadata||{}),closedVia:options.automatic?'automatic':'manual'}};
     if (options.correction) rally.correction=clone(options.correction);
     set.rallies.push(rally);set.score[winner]++;
-    if (set.opponentLineup&&set.serve==='us'&&winner==='them') {
+    if (set.training?.rotations!==false&&set.opponentLineup&&set.serve==='us'&&winner==='them') {
       set.opponentLineup.current=rotate(set.opponentLineup.current);set.opponentLineup.rotation=set.opponentLineup.rotation%6+1;
     }
-    if (set.serve==='them'&&winner==='us') {set.positions=rotate(set.positions);set.rotation=set.rotation%6+1;}
+    if (set.training?.rotations!==false&&set.serve==='them'&&winner==='us') {set.positions=rotate(set.positions);set.rotation=set.rotation%6+1;}
     set.serve=winner;
-    const target=match.bestOf===5&&set.number===5?15:25;
-    if (Math.max(set.score.us,set.score.them)>=target&&Math.abs(set.score.us-set.score.them)>=2) {set.finished=true;set.winner=set.score.us>set.score.them?'us':'them';}
-    return {rally,rotated:before.serve!==winner,winningSide:winner};
+    const target=set.training?.type==='game'?(set.training.target||Infinity):(match.bestOf===5&&set.number===5?15:25);
+    const margin=set.training?.type==='game'?(set.training.winBy||1):2;
+    if (Math.max(set.score.us,set.score.them)>=target&&Math.abs(set.score.us-set.score.them)>=margin) {set.finished=true;set.winner=set.score.us>set.score.them?'us':'them';}
+    return {rally,rotated:set.training?.rotations!==false&&before.serve!==winner,winningSide:winner};
   }
   function rotate(positions) {return [...positions.slice(1),positions[0]];}
   function undoRally(set,{allowLaterChanges=false}={}) {
@@ -113,5 +133,5 @@ const VolleyEngine = (() => {
     set.finished=false;set.winner=null;
     return {rally,actions:clone(rally.actions||[])};
   }
-  return {createAction,closeRally,undoRally,terminalWinner,onCourt,rotate};
+  return {createAction,closeRally,undoRally,terminalWinner,terminalCause,onCourt,rotate};
 })();

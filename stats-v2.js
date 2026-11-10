@@ -35,6 +35,7 @@
   }
   function participants(action) {
     const ids = Array.isArray(action?.participants) ? action.participants.map(p=>typeof p === 'string' ? p : p?.id || p?.playerId).filter(Boolean) : [];
+    if(action?.skill==='rival_attack')return action.outcomeId==='blocked_point'&&!action.metadata?.linkedOwnBlockActionId?(action.metadata?.ownBlockers||[]):[];
     if (action?.playerId) ids.unshift(action.playerId);
     return [...new Set(ids)];
   }
@@ -80,7 +81,8 @@
     const conventionalKills=attackEntries.filter(e=>e.result.outcomeId==='kill'&&e.action.metadata?.attackType==='conventional').length;
     const unspecifiedKills=ac('kill')-conventionalKills,useBlockOutKills=ac('use_block_out'),tipKills=ac('tip_kill');
     const K=conventionalKills+unspecifiedKills+useBlockOutKills+tipKills,blocked=ac('blocked_point'),E=ac('error')+(config.blockedPointIsError ? blocked : 0);
-    const blockPoints = list.filter(e=>e.action.skill === 'block' && e.result.outcomeId === 'point');
+    const rivalBlocks=list.filter(e=>e.action.skill==='rival_attack'&&e.action.outcomeId==='blocked_point'&&!e.rally.actions.some(a=>a.skill==='block'&&a.outcomeId==='point'));
+    const blockPoints = [...list.filter(e=>e.action.skill === 'block' && e.result.outcomeId === 'point'),...rivalBlocks.map(e=>({...e,action:{...e.action,skill:'block',playerId:null,participants:e.action.metadata?.ownBlockers||[]}}))];
     const distribution={};
     for (const e of list.filter(e=>e.action.skill === 'setting')) {
       const target=e.action.metadata?.settingTarget || 'unknown';
@@ -99,7 +101,7 @@
       attack:{total:attackEntries.length,attempts:attackEntries.length,kills:K,conventionalKills,unspecifiedKills,useBlockOutKills,tipKills,tipContinues:ac('tip_continue'),errors:E,continues:ac('continue')+ac('tip_continue'),coveredBlocks:ac('covered_block'),blockedPoints:blocked,ambiguousBlocks:ac('ambiguous_block'),efficiency:percent(K-E,attackEntries.length),killPct:percent(K,attackEntries.length),origin,destination,phase,byRole},
       serve:{total:total('serve'),aces:count('serve','ace'),positive:count('serve','positive'),neutral:count('serve','neutral'),errors:count('serve','error'),acePct:percent(count('serve','ace'),total('serve')),errorPct:percent(count('serve','error'),total('serve'))},
       reception:{...reception,perfectPct:percent(reception.q3,reception.total),positivePct:percent(reception.q2+reception.q3,reception.total),errorPct:percent(reception.q0,reception.total)},
-      block:{total:total('block'),points:blockPoints.length,soloPoints:blockPoints.filter(e=>blockComposition(e.action) === 'solo').length,assistedPoints:blockPoints.filter(e=>blockComposition(e.action) === 'assisted').length,unknownPoints:blockPoints.filter(e=>blockComposition(e.action) === 'unknown').length,positiveTouches:count('block','positive_touch'),uncontrolledTouches:count('block','uncontrolled_touch'),faults:count('block','fault')},
+      block:{total:total('block')+rivalBlocks.length,points:blockPoints.length,soloPoints:blockPoints.filter(e=>blockComposition(e.action) === 'solo').length,assistedPoints:blockPoints.filter(e=>blockComposition(e.action) === 'assisted').length,unknownPoints:blockPoints.filter(e=>blockComposition(e.action) === 'unknown').length,positiveTouches:count('block','positive_touch'),uncontrolledTouches:count('block','uncontrolled_touch'),faults:count('block','fault')},
       defense:{total:total('defense'),perfect:count('defense','perfect'),positive:count('defense','positive'),limited:count('defense','limited'),directErrors:count('defense','direct_error')},
       setting:{total:total('setting'),perfect:count('setting','perfect'),good:count('setting','good'),forced:count('setting','forced'),directErrors:count('setting','direct_error'),distribution,assists:0}
     };

@@ -3,8 +3,9 @@
   'use strict';
   const SCHEMA_VERSION = 2;
   const DEFAULT_KEY = 'volley_scout_avanzado_v1';
-  const SKILLS = ['serve','reception','attack','block','defense','setting'];
+  const SKILLS = ['rival_attack','serve','reception','attack','block','defense','setting'];
   const RESULTS = {
+    rival_attack:['kill','continue','error','blocked_point'],
     serve:['ace','positive','neutral','error'],
     reception:['perfect','positive','poor','direct_error'],
     attack:['kill','continue','use_block_out','tip_kill','tip_continue','covered_block','blocked_point','error','ambiguous_block'],
@@ -13,6 +14,7 @@
     setting:['perfect','good','forced','direct_error']
   };
   const LABELS = {
+    rival_attack:{'PUNTO RIVAL':'kill','SIGUE / DEFENDIDO':'continue','ERROR RIVAL':'error','BLOQUEO NUESTRO':'blocked_point'},
     serve:{Ace:'ace',Positivo:'positive',Continuidad:'neutral',Neutro:'neutral',Error:'error'},
     reception:{Perfecta:'perfect',Positiva:'positive',Negativa:'poor',Mala:'poor',Error:'direct_error','Error directo':'direct_error'},
     attack:{Punto:'kill',Continuidad:'continue',Sigue:'continue','Bloqueo cubierto':'covered_block','Bloqueo punto':'blocked_point',Error:'error'},
@@ -75,7 +77,7 @@
       }
       if (value.scoreAtRegistration !== undefined) score(value.scoreAtRegistration,path+'.scoreAtRegistration');
     }
-    function actions(rows,path,players) {
+    function actions(rows,path,players,rivals=new Set()) {
       if (!Array.isArray(rows)) { fail(path,'Las acciones deben ser una lista.'); return; }
       const actionIds = new Set();
       rows.forEach((a,i) => {
@@ -84,7 +86,7 @@
         if (a.schemaVersion !== undefined && ![1,2].includes(a.schemaVersion)) fail(ap+'.schemaVersion','Esquema de acción incompatible.');
         if (a.id !== undefined) { if (!id(a.id) || actionIds.has(a.id)) fail(ap+'.id','ID de acción inválido o duplicado.'); actionIds.add(a.id); }
         if (!SKILLS.includes(a.skill)) fail(ap+'.skill','Fundamento desconocido.');
-        if (!players.has(a.playerId)) fail(ap+'.playerId','La acción pertenece a un jugador inexistente.');
+        if (!(a.skill==='rival_attack'?rivals:players).has(a.playerId)) fail(ap+'.playerId','La acción pertenece a un jugador inexistente.');
         if (a.participants !== undefined && (!Array.isArray(a.participants) || a.participants.some(p => !players.has(p)) || new Set(a.participants).size !== a.participants.length)) fail(ap+'.participants','Los participantes deben ser jugadores distintos del plantel.');
         if (typeof a.outcome !== 'string' && typeof a.outcomeId !== 'string') fail(ap+'.outcome','Falta el resultado de la acción.');
         if (a.outcomeId !== undefined && !RESULTS[a.skill]?.includes(a.outcomeId)) warn(ap+'.outcomeId','Resultado desconocido: se conserva sin interpretación estadística.');
@@ -103,6 +105,7 @@
       value.matches.forEach((m,mi) => {
         const mp = 'matches['+mi+']';
         if (!object(m)) return;
+        if(m.rivalPlayers!==undefined){if(!Array.isArray(m.rivalPlayers))fail(mp+'.rivalPlayers','Plantel rival inválido.');else {identities(m.rivalPlayers,mp+'.rivalPlayers');const numbers=new Set();m.rivalPlayers.forEach(p=>{if(!object(p)||typeof p.number!=='string'||!/^\d{1,3}$/.test(p.number)||numbers.has(p.number)||!['outside','opposite','middle','setter','libero'].includes(p.position)||typeof p.name!=='string')fail(mp+'.rivalPlayers','Atacante rival inválido o repetido.');if(object(p))numbers.add(p.number);});}}
         const playerIds = roster(m.players,mp+'.players',false);
         for (const field of ['team','opponent']) if (typeof m[field] !== 'string') fail(mp+'.'+field,'Falta el nombre del equipo.');
         if (typeof m.createdAt !== 'string' || !m.createdAt) fail(mp+'.createdAt','Falta la fecha de creación del partido.');
@@ -142,10 +145,10 @@
             if (!Number.isInteger(r.rotation) || r.rotation < 1 || r.rotation > 6) fail(rp+'.rotation','Rotación previa inválida.');
             score(r.scoreBefore,rp+'.scoreBefore'); positions(r.positions,rp+'.positions',playerIds);
             libero(r.liberoBefore,rp+'.liberoBefore',playerIds); opponent(r.opponentBefore,rp+'.opponentBefore');
-            actions(r.actions,rp+'.actions',playerIds);
+            actions(r.actions,rp+'.actions',playerIds,new Set((Array.isArray(m.rivalPlayers)?m.rivalPlayers:[]).filter(object).map(p=>p.id)));
           });
           if (object(s.score) && s.score.us+s.score.them !== s.rallies.length) warn(sp+'.score','El marcador no coincide con la cantidad de rallies; se conserva tal como fue registrado.');
-          if (s.openRally?.actions) actions(s.openRally.actions,sp+'.openRally.actions',playerIds);
+          if (s.openRally?.actions) actions(s.openRally.actions,sp+'.openRally.actions',playerIds,new Set((Array.isArray(m.rivalPlayers)?m.rivalPlayers:[]).filter(object).map(p=>p.id)));
         });
       });
     }
@@ -169,7 +172,7 @@
         if (!object(open)) fail('openRallies.'+setId,'Rally abierto inválido.');
         else {
           const players=new Set((Array.isArray(match.players) ? match.players : []).filter(object).map(p => p.id));
-          actions(open.actions,'openRallies.'+setId+'.actions',players);
+          actions(open.actions,'openRallies.'+setId+'.actions',players,new Set((Array.isArray(match.rivalPlayers)?match.rivalPlayers:[]).filter(object).map(p=>p.id)));
           if (open.selectedSkill != null && !SKILLS.includes(open.selectedSkill)) fail('openRallies.'+setId+'.selectedSkill','Fundamento seleccionado inválido.');
           if (open.selectedPlayerId != null && !players.has(open.selectedPlayerId)) warn('openRallies.'+setId+'.selectedPlayerId','El jugador seleccionado ya no existe; se conserva la referencia para revisión.');
         }
@@ -233,6 +236,8 @@
     let winner=null;
     if ((skill === 'serve' && outcomeId === 'ace') || (skill === 'attack' && ['kill','use_block_out','tip_kill'].includes(outcomeId)) || (skill === 'block' && outcomeId === 'point')) winner='us';
     if ((skill === 'serve' && outcomeId === 'error') || (skill === 'attack' && ['error','blocked_point'].includes(outcomeId)) || (skill === 'block' && outcomeId === 'fault') || ['reception','defense','setting'].includes(skill) && outcomeId === 'direct_error') winner='them';
+    if(skill==='rival_attack')winner=outcomeId==='kill'?'them':['error','blocked_point'].includes(outcomeId)?'us':null;
+    if(skill==='rival_attack'&&a.metadata?.linkedOwnBlockActionId)winner=null;
     const quality = skill === 'reception' ? ({perfect:3,positive:2,poor:1,direct_error:0}[outcomeId] ?? null) : null;
     return {skill,outcomeId,legacy,ambiguous,reason,terminal:winner !== null,winner,quality,
       attackAttempt:skill === 'attack' && outcomeId !== 'unknown',kill:skill === 'attack' && ['kill','use_block_out','tip_kill'].includes(outcomeId),

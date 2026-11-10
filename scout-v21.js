@@ -25,4 +25,4 @@ function handleScoutV21Action(action,t){
   if(action==='coach-open'){statSet=matchEnded(activeMatch())?'all':String(activeSet().number);view='stats';save();render();document.getElementById('coach-report')?.scrollIntoView?.({block:'start'});return true;}
   return false;
 }
-document.addEventListener('change',event=>{const t=event.target;if(t.matches('[data-v21-role]')){attackRoleOverride=['front','back','unknown'].includes(t.value)?t.value:'auto';save();render();}});
+document.addEventListener('change',event=>{const t=event.target;if(t.matches('[data-v21-role]')){attackRoleOverride=['front','back','unknown'].includes(t.value)?t.value:'auto';originZone=defaultAttackOrigin();setRivalBlockers(useBlockerDraft,[]);save();render();}});

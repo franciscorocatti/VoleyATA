@@ -10,10 +10,10 @@ const VolleyCatalog = (() => {
     defense:{name:'Defensa',outcomes:[o('perfect','Perfecta','Perfecta'),o('positive','Positiva','Positiva'),o('limited','Limitada','Negativa'),o('direct_error','Error directo','Error','them')]},
     setting:{name:'Armado',outcomes:[o('perfect','Perfecto','Perfecta'),o('good','Bueno','Positiva'),o('forced','Forzado','Negativa'),o('direct_error','Error directo','Error','them')]}
   };
-  function find(skill,result) { return definitions[skill]?.outcomes.find(o=>o.id===result||o.label===result||o.legacy===result)||null; }
+  function find(skill,result) { if(skill==='rival_attack'){const r=({kill:{label:'PUNTO RIVAL',winner:'them'},continue:{label:'SIGUE / DEFENDIDO',winner:null},error:{label:'ERROR RIVAL',winner:'us'},blocked_point:{label:'BLOQUEO NUESTRO',winner:'us'}})[result];return r?{id:result,legacy:r.label,...r}:null;}return definitions[skill]?.outcomes.find(o=>o.id===result||o.label===result||o.legacy===result)||null; }
   function outcome(action,rally) {
     const adapted=typeof VolleyData!=='undefined'?VolleyData.getActionResult(action,rally):null;
-    return find(action.skill,action.outcomeId||adapted?.outcomeId||action.outcome);
+    const result=find(action.skill,action.outcomeId||adapted?.outcomeId||action.outcome);return action.skill==='rival_attack'&&action.metadata?.linkedOwnBlockActionId&&result?{...result,winner:null}:result;
   }
   return {definitions,find,outcome};
 })();
@@ -34,7 +34,7 @@ const VolleyEngine = (() => {
     if (!onCourt(set).includes(player.id)) return {error:'Ese jugador no está en cancha. Registrá primero el cambio o elegí un jugador en cancha.'};
     if(!repetition&&player.isLibero&&['serve','block'].includes(input.skill))return {error:'Con el criterio FIVB, el líbero no puede sacar ni bloquear. Revisá el jugador seleccionado.'};
     if (!repetition&&input.skill==='serve'&&(set.serve!=='us'||actions.length)) return {error:'El saque solo se registra al comenzar un rally con servicio nuestro.'};
-    if (!repetition&&input.skill==='reception'&&(set.serve!=='them'||actions.some(a=>['serve','reception','attack','defense'].includes(a.skill)))) return {error:'La recepción corresponde al primer contacto de un saque rival. Para una pelota en juego usá Defensa.'};
+    if (!repetition&&input.skill==='reception'&&(set.serve!=='them'||actions.some(a=>['serve','reception','attack','defense','rival_attack'].includes(a.skill)))) return {error:'La recepción corresponde al primer contacto de un saque rival. Para una pelota en juego usá Defensa.'};
     const participants=[...new Set([player.id,...(input.skill==='block'?(input.participants||[]):[])])];
     if (participants.length>3||participants.some(p=>!onCourt(set).includes(p)||!match.players.some(x=>x.id===p))) return {error:'Elegí hasta tres bloqueadores que estén en cancha.'};
     if(!repetition&&input.skill==='block'&&participants.some(id=>match.players.find(p=>p.id===id)?.isLibero))return {error:'El líbero no puede participar del bloqueo.'};
@@ -46,12 +46,12 @@ const VolleyEngine = (() => {
       } else if(['kill','continue'].includes(definition.id)) {
         if(!['free_ball','freeball'].includes(metadata.attackType))metadata.attackType='conventional';
       }
-      else if(['use_block_out','tip','conventional'].includes(metadata.attackType)) delete metadata.attackType;
+      else if(definition.id!=='error'&&['use_block_out','tip','conventional'].includes(metadata.attackType)) delete metadata.attackType;
     }
     if (input.skill==='attack'&&!metadata.attackPhase) {
       const lastAttack=actions.map(a=>a.skill).lastIndexOf('attack');
       const recent=actions.slice(lastAttack+1);
-      metadata.attackPhase=recent.some(a=>a.skill==='defense')?'counterattack':lastAttack<0&&recent.some(a=>a.skill==='reception')?'reception':null;
+      metadata.attackPhase=recent.some(a=>['defense','rival_attack'].includes(a.skill))?'counterattack':lastAttack<0&&recent.some(a=>a.skill==='reception')?'reception':null;
       const setter=actions.at(-1);
       if (setter?.skill==='setting') metadata.setterId=setter.playerId;
     }
@@ -77,7 +77,7 @@ const VolleyEngine = (() => {
   function terminalCause(actions){
     const action=actions.at(-1),result=action&&VolleyCatalog.outcome(action);
     if(!result?.winner)return null;
-    const allowed=result.winner==='us'?[]:action.skill==='attack'&&result.id==='blocked_point'?['opponent_block']:action.skill==='reception'?['opponent_serve','own_error']:['own_error'];
+    const allowed=action.skill==='rival_attack'?(action.outcomeId==='kill'?['opponent_attack']:action.outcomeId==='error'?['opponent_error']:[]):result.winner==='us'?[]:action.skill==='attack'&&result.id==='blocked_point'?['opponent_block']:action.skill==='reception'?['opponent_serve','own_error']:['own_error'];
     return {winner:result.winner,allowed,preferred:allowed[0]||null};
   }
   function closeRally(match,set,actions,options={}) {
@@ -92,12 +92,13 @@ const VolleyEngine = (() => {
     const terminal=terminalCause(actions),cause=options.cause||null;
     if(cause==='opponent_serve'&&set.serve!=='them')return {error:'Un ace rival corresponde a un rally que comenzó con saque rival. Revisá la causa o el servicio.'};
     if(terminal&&cause&&cause!=='unknown'&&!terminal.allowed.includes(cause))return {error:'La causa no coincide con la acción terminal. Corregí la acción o elegí una causa compatible.'};
-    if (actions.some(a=>!match.players.some(p=>p.id===a.playerId))) return {error:'Hay una acción atribuida a un jugador inexistente.'};
+    if (actions.some(a=>!(a.skill==='rival_attack'?(match.rivalPlayers||[]):match.players).some(p=>p.id===a.playerId))) return {error:'Hay una acción atribuida a un jugador inexistente.'};
     for(let i=0;i<actions.length;i++){
       const action=actions[i],previous=actions.slice(0,i);
+      if(action.skill==='rival_attack'){if(!['kill','continue','error','blocked_point'].includes(action.outcomeId))return {error:'Resultado rival inválido.'};if(action.metadata?.linkedOwnBlockActionId&&(action.outcomeId!=='blocked_point'||!actions.slice(i+1).some(b=>b.id===action.metadata.linkedOwnBlockActionId&&b.skill==='block'&&b.outcomeId==='point')))return {error:'El bloqueo propio asociado ya no existe.'};continue;}
       if(!onCourt(set).includes(action.playerId))return {error:'Hay una acción pendiente de un jugador fuera de cancha. Corregila antes de cerrar.'};
       if(action.skill==='serve'&&(set.serve!=='us'||i!==0))return {error:'La secuencia contiene un saque que no corresponde al servicio inicial.'};
-      if(action.skill==='reception'&&(set.serve!=='them'||previous.some(a=>['serve','reception','attack','defense'].includes(a.skill))))return {error:'La recepción pendiente no corresponde al saque rival. Revisá la secuencia.'};
+      if(action.skill==='reception'&&(set.serve!=='them'||previous.some(a=>['serve','reception','attack','defense','rival_attack'].includes(a.skill))))return {error:'La recepción pendiente no corresponde al saque rival. Revisá la secuencia.'};
       if(action.skill==='block'&&(action.participants||[]).some(id=>!onCourt(set).includes(id)))return {error:'Hay un bloqueador pendiente fuera de cancha.'};
     }
     const before={score:clone(set.score),serve:set.serve,rotation:set.rotation,positions:[...set.positions],libero:clone(set.libero||null),

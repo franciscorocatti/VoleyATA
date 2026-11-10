@@ -16,7 +16,7 @@ function directPointSequence(rally) {
   // No reconstruir una secuencia a partir de acciones que ya habían cerrado el punto.
   if (before.some(a => sequenceOutcome(a,rally).terminal)) return null;
   const reception = before.findIndex(a => a.skill === 'reception');
-  if (rally.serveBefore === 'them' && reception >= 0 && !before.some(a => ['defense','serve'].includes(a.skill))) return 'reception';
+  if (rally.serveBefore === 'them' && reception >= 0 && !before.some(a => ['defense','serve','rival_attack'].includes(a.skill))) return 'reception';
   const serve = before.findIndex(a => a.skill === 'serve');
   const defense = before.findIndex(a => a.skill === 'defense');
   if (rally.serveBefore === 'us' && serve >= 0 && defense > serve && reception === -1) return 'serveDefense';

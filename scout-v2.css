@@ -101,3 +101,9 @@
 }
 @media(max-width:374px){.v2-mode-switch button{font-size:10px;padding:5px 6px}.v2-auto{font-size:9px}.v2-skills .skill{font-size:10px}.v2-skills svg{width:18px;height:18px;flex-basis:18px}}
 @media print{.v2-live-head{position:static}.v2-point-dock{display:none!important}.scout-v2{padding-bottom:0}}
+
+.attack-fast{display:flex;gap:8px;margin:10px 0;flex-wrap:wrap}.attack-fast>.btn{flex:1;min-height:52px;min-width:85px;padding:10px 8px}.attack-fast .btn-primary{outline:2px solid var(--primary);outline-offset:1px}
+
+.rival-access{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.rival-access>.btn{flex:1;min-height:48px}.rival-players .btn{display:flex;flex-direction:column;align-items:center}.rival-players strong{font-size:24px}.rival-players small{color:inherit}.rival-results{display:grid;grid-template-columns:1fr 1fr}.rival-trend{margin:10px 0;padding:12px}.has-rival-panel>.v2-live-head{position:sticky;top:0;z-index:20;background:var(--bg);padding:8px}.rival-entry input[type=checkbox]{width:20px;min-height:20px}.rival-entry fieldset{margin-top:12px}
+
+.rival-trend-compact p{margin:4px 0}.rival-trend-compact p br{display:none}.rival-trend-compact p strong{margin-right:8px}.rival-trend-compact small{display:none}

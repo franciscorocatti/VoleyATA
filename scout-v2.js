@@ -36,6 +36,13 @@ function renderFlowSkills(){
 function prepareFlowInputs(){
   if(!flowEnabled())return;
   flowOriginSource='unknown';flowDestinationSource='unknown';flowBlockers=[];
+  const previous=editingActionIndex===null?null:pending[editingActionIndex];
+  if(previous?.skill===selectedSkill&&['reception','defense'].includes(selectedSkill)){
+    if(previous.metadata?.originSource==='observed'){originZone=previous.originZone;flowOriginSource='observed';return;}
+    const context=previous.metadata?.[selectedSkill==='reception'?'receptionContext':'defenseContext'];
+    const guess=selectedSkill==='reception'?(context?VolleyRally.receptionSuggestion(context,selectedPlayerId):{zone:null,source:'unknown'}):VolleyRally.defenseSuggestion(context,selectedPlayerId);
+    originZone=guess.zone;flowOriginSource=guess.source;return;
+  }
   if(selectedSkill==='serve'){originZone=1;flowOriginSource='serve-default';}
   if(selectedSkill==='reception'){const guess=VolleyRally.receptionZone(activeMatch(),activeSet(),activeSide,selectedPlayerId);originZone=guess.zone;flowOriginSource=guess.source;}
   if(selectedSkill==='attack'){originZone=defaultAttackOrigin();flowOriginSource=originZone?'role-zone':'unknown';}
@@ -56,6 +63,7 @@ function flowMetadata(){
     originSource:flowOriginSource,destinationSource:flowDestinationSource,
     serveDirection:serveDirectionManual,serveDirectionSource:serveDirectionManual?'observed':'derived',
     receptionContext:selectedSkill==='reception'?VolleyRally.receptionContext(activeMatch(),activeSet(),activeSide):null,
+    defenseContext:selectedSkill==='defense'?{...VolleyCourt.layout(activeMatch(),activeSet(),activeSide),positions:[...VolleyRally.positions(activeSet(),activeSide)]}:null,
     rotationServerContext:selectedSkill==='reception'?{side:activeSet().serve,playerId:VolleyRally.positions(activeSet(),activeSet().serve)[0]||null,source:'rotation'}:null,
     tacticalContext:VolleyCourt.enabled(activeMatch(),activeSet())?VolleyCourt.location(activeMatch(),activeSet(),activeSide,selectedPlayerId):null,
     directionSource:attackDirection?'observed':'unknown',attackDirection,attackType,
@@ -68,7 +76,15 @@ function addFlowAction(result,input={}){
   const now=Date.now(),m=activeMatch(),s=activeSet();if(now-lastPointCommit<600||now-lastActionTap<260||!m||!s)return false;
   const index=editingActionIndex,previous=index===null?null:pending[index],base=index===null?pending:pending.slice(0,index);
   const currentMetadata=flowMetadata();if(previous?.playerId===selectedPlayerId&&previous.metadata?.tacticalContext)currentMetadata.tacticalContext=previous.metadata.tacticalContext;
-  const created=VolleyEngine.createAction({id:previous?.id,side:activeSide,playerId:selectedPlayerId,skill:selectedSkill,outcomeId:result,originZone,destinationZone,attackRoleOverride,participants:ownBlockers,metadata:{...previous?.metadata,...currentMetadata},...input},{match:m,set:s,actions:base,mode:scoutMode});
+  let actionOrigin=originZone;
+  if(previous?.skill===selectedSkill&&['reception','defense'].includes(selectedSkill)){
+    const key=selectedSkill==='reception'?'receptionContext':'defenseContext';currentMetadata[key]=previous.metadata?.[key]||null;
+    if(previous.playerId!==selectedPlayerId&&flowOriginSource!=='observed'){
+      const guess=selectedSkill==='reception'?(currentMetadata[key]?VolleyRally.receptionSuggestion(currentMetadata[key],selectedPlayerId):{zone:null,source:'unknown'}):VolleyRally.defenseSuggestion(currentMetadata[key],selectedPlayerId);
+      actionOrigin=guess.zone;currentMetadata.originSource=guess.source;if(selectedSkill==='defense')currentMetadata.tacticalContext=guess.tacticalContext;
+    }
+  }
+  const created=VolleyEngine.createAction({id:previous?.id,side:activeSide,playerId:selectedPlayerId,skill:selectedSkill,outcomeId:result,originZone:actionOrigin,destinationZone,attackRoleOverride,participants:ownBlockers,metadata:{...previous?.metadata,...currentMetadata},...input},{match:m,set:s,actions:base,mode:scoutMode});
   if(created.error){toast(created.error);return false;}
   if(created.terminalWinner&&index!==null&&index!==pending.length-1){toast('La acción terminal debe quedar al final. Quitá o corregí primero las posteriores.');return false;}
   if(index===null)pending.push(created.action);else pending[index]=created.action;
@@ -110,6 +126,17 @@ function handleFlowAction(action,t){
   if(action==='court-reset-layout'){if(s?.tacticalOverrides)delete s.tacticalOverrides[t.dataset.side];refreshTacticalInput();save();render();return true;}
   if(action==='court-early-phases'){earlyPhasesExpanded=!earlyPhasesExpanded;render();return true;}
   if(action==='flow-enable'){if(!betweenRallies(s))return true;enableRallyFlow(m,s);beginRallyFlow();save();render();return true;}
+  if(action==='flow-stat-panel'){const valid=flowStatsView==='post'?['summary','fundamentals','attack','serve','maps','evolution','rankings']:['summary','attack','serve','players','maps'];if(valid.includes(t.dataset.panel)){if(flowStatsView==='post')flowStatsPostPanel=t.dataset.panel;else flowStatsLivePanel=t.dataset.panel;}flowStatsPlayer='';flowStatsMapPlayer='';render();return true;}
+  if(action==='flow-stat-side'){if(['us','them','both'].includes(t.dataset.side))flowStatsSide=t.dataset.side;flowStatsPlayer='';flowStatsMapPlayer='';flowMapSelection='';render();return true;}
+  if(action==='flow-stat-skill'){if([...Object.keys(skills),'coverage'].includes(t.dataset.skill))flowStatsSkill=t.dataset.skill;render();return true;}
+  if(action==='flow-stat-clear'){flowStatsOrigin='';flowStatsRole='';flowStatsRotation='';flowStatsType='';flowStatsDirection='';flowStatsProvenance='';flowMapSelection='';render();return true;}
+  if(action==='flow-all-sets'){statSet='all';render();return true;}
+  if(action==='flow-profile-close'){flowStatsPlayer='';flowStatsMapPlayer='';render();return true;}
+  if(action==='flow-player-map'){flowStatsSide=t.dataset.side;flowStatsMapPlayer=t.dataset.player;if(flowStatsView==='live'){flowStatsPlayer='';flowStatsLivePanel='maps';}else flowStatsPlayer=t.dataset.player;render();return true;}
+  if(action==='flow-stat-view'){flowStatsView=t.dataset.mode==='post'?'post':'live';render();return true;}
+  if(action==='flow-current-set'){statSet=String(s.number);render();return true;}
+  if(action==='flow-player-stats'){flowStatsSide=t.dataset.side;flowStatsPlayer=t.dataset.player;flowStatsMapPlayer='';flowMapSelection='';flowStatsView='post';render();return true;}
+  if(action==='flow-map'){flowMapSelection=t.dataset.key;render();return true;}
   if(!flowEnabled())return false;
   if(action==='v2-edit-cancel'){resetActionInputs();earlyPhasesExpanded=false;beginRallyFlow();save();render();return true;}
   if(action==='flow-serve-direction'){serveDirectionManual=['paralela','diagonal'].includes(t.dataset.direction)?t.dataset.direction:null;save();render();return true;}
@@ -129,10 +156,6 @@ function handleFlowAction(action,t){
     if(result.error){toast(result.error);return true;}
     flowHistory=null;beginRallyFlow();save();render();toast('Corrección guardada · informes recalculados.');return true;
   }
-  if(action==='flow-stat-view'){flowStatsView=t.dataset.mode==='post'?'post':'live';render();return true;}
-  if(action==='flow-current-set'){statSet=String(s.number);render();return true;}
-  if(action==='flow-player-stats'){flowStatsSide=t.dataset.side;flowStatsPlayer=t.dataset.player;flowStatsView='post';render();return true;}
-  if(action==='flow-map'){flowMapSelection=t.dataset.key;render();return true;}
   if(action==='rival-toggle'){setFlowPhase({side:'them',skill:'attack'});save();render();return true;}
   if(action==='select-player'||action==='flow-player'){
     const editing=editingActionIndex;activeSide=t.dataset.side==='them'?'them':'us';selectedPlayerId=t.dataset.player;resetActionInputs();editingActionIndex=editing;prepareFlowInputs();save();render();return true;

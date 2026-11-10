@@ -186,3 +186,63 @@
 /* Tendencias compactas durante el partido. */
 .flow-statistics[data-report-mode=live] .flow-map svg{max-height:260px}
 .flow-statistics[data-report-mode=live] .flow-heat button{min-height:76px}
+
+/* Statistics: quick reading first, one analysis panel at a time. */
+.stats-workspace{max-width:1380px;margin:auto;gap:18px}
+.stats-workspace h1{font-size:clamp(22px,3vw,32px);margin:4px 0}
+.stats-workspace h2{font-size:19px;margin:0 0 14px}
+.stats-workspace h3{font-size:16px}
+.stats-eyebrow{font-size:11px;letter-spacing:.12em;color:#548077;font-weight:700;margin:0}
+.stats-workspace .card{border:1px solid #dfe9e5;box-shadow:0 3px 14px #244b3b06;border-radius:18px;margin:0;padding:20px;min-width:0}
+.stats-workspace .stats-toolbar{display:flex;flex-wrap:wrap;align-items:end;gap:16px;justify-content:space-between}
+.stats-pills,.stats-panel-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.stats-pills .btn,.stats-panel-tabs .btn{min-height:44px;white-space:normal}
+.stats-panel-tabs{padding:4px 0;border-bottom:1px solid #dce9e3;padding-bottom:14px}
+.stats-period{display:flex;flex-wrap:wrap;gap:8px;align-items:end}
+.stats-period label{min-width:150px}
+.stats-team-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.stats-team-us{border-top:4px solid #168975!important}
+.stats-team-them{border-top:4px solid #657e9b!important}
+.stats-tag{display:inline-block;font-size:11px;font-weight:700;border-radius:30px;padding:5px 10px;background:#e9f3ef;color:#346453}
+.stats-team-them .stats-tag{background:#edf1f7;color:#536b8a}
+.stats-summary-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 12px}
+.stats-number{min-width:0}
+.stats-number>span,.stats-number>strong,.stats-number>small{display:block}
+.stats-number>span{font-size:12px;min-height:30px;color:#526d63}
+.stats-number>strong{font-size:26px;line-height:1.3;letter-spacing:-.03em;color:#173f32}
+.stats-number>small{font-size:11px;color:#678075;margin-top:3px}
+.stats-sample{font-size:11px;color:#6c7f76;margin:16px 0 0;padding-top:10px;border-top:1px solid #e3ece7}
+.stats-reading ul{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 24px;padding-left:20px;margin:0;line-height:1.6}
+.stats-cell-note{display:block;font-size:11px;color:#647c72;font-weight:400;white-space:normal}
+.stats-workspace table{width:100%;font-size:13px}
+.stats-workspace th{text-align:left;white-space:normal}
+.stats-workspace td{white-space:normal}
+.stats-workspace .tablewrap{max-width:100%;overflow:auto}
+.stats-player-trends{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px}
+.stats-player-trend{border:1px solid #dce8e1;border-radius:14px;padding:14px;background:#f8fbf9;min-width:0}
+.stats-player-trend p{font-size:13px}
+.stats-frequency{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:12px 0}
+.stats-frequency span{font-size:11px;color:#577367}
+.stats-frequency strong{display:block;font-size:12px;color:#244f40}
+.stats-inline-metrics{display:flex;gap:20px;flex-wrap:wrap}
+.stats-inline-metrics strong{font-size:24px;color:#185943}
+.stats-detail-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin:16px 0}
+.stats-detail-grid>div,.stats-detail-grid>section{padding:14px;border-radius:12px;background:#f3f8f5;min-width:0}
+.stats-detail-grid dt{font-size:12px;color:#536f61}
+.stats-detail-grid dd{margin:7px 0 0;font-size:23px;font-weight:700;color:#234f3d}
+.stats-workspace details{margin-top:14px}
+.stats-workspace summary{cursor:pointer;padding:10px 0;font-weight:600;min-height:44px}
+.stats-workspace .stats-advanced{padding:8px 20px}
+.stats-advanced>small{display:block;margin-top:12px;color:#60766a}
+.stats-comparison-controls{max-width:280px}
+.stats-footer{font-size:12px;color:#5c7469;padding-top:10px;border-top:1px solid #dce8e2}
+.stats-profile{border-top:4px solid #168975!important}
+.stats-workspace button:focus-visible,.stats-workspace select:focus-visible{outline:3px solid #d3a446;outline-offset:3px}
+.stats-workspace .row-between{gap:12px;flex-wrap:wrap}
+.stats-workspace button,.stats-workspace label,.stats-workspace p{overflow-wrap:anywhere}
+.stats-workspace .flow-map{background:#f4f8f5}
+.stats-workspace[data-report-mode=post] .flow-map svg{max-height:460px}
+.stats-workspace .flow-map.flow-map-small svg{max-height:210px}
+@media(max-width:1000px){.stats-team-grid{grid-template-columns:1fr}.stats-summary-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.stats-workspace .stats-toolbar{align-items:stretch}.stats-reading ul{grid-template-columns:1fr}}
+@media(max-width:600px){.stats-workspace{gap:12px}.stats-workspace .card{padding:14px;border-radius:15px}.stats-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.stats-number>strong{font-size:25px}.stats-number>span{min-height:0}.stats-panel-tabs{gap:6px}.stats-panel-tabs .btn{flex:1 1 125px;font-size:12px}.stats-period{width:100%}.stats-period label{width:100%}.stats-period .btn{flex:1}.stats-pills .btn{flex:1;min-width:85px}.stats-workspace .flow-stat-filters{grid-template-columns:1fr}.stats-frequency{grid-template-columns:1fr;gap:6px}.stats-frequency span{display:flex;justify-content:space-between}.stats-team-grid{gap:12px}.stats-detail-grid{grid-template-columns:1fr 1fr}.stats-workspace h1{font-size:23px}}
+@media print{.stats-workspace .stats-toolbar,.stats-panel-tabs,.stats-pills,.stats-advanced,.stats-workspace>header>.btn{display:none!important}.stats-workspace .card{box-shadow:none;break-inside:avoid}.stats-team-grid{grid-template-columns:1fr 1fr}.stats-workspace .flow-map svg{max-height:300px}}

@@ -46,6 +46,11 @@ const VolleyRally = (() => {
     return {zone:pos||null,source:pos?'rotation-reference':'unknown'};
   }
   function receptionZone(m,set,team,id){return receptionSuggestion(receptionContext(m,set,team),id);}
+  function defenseSuggestion(context,id){
+    const zone=context?.tactical?context.ids?.indexOf(id)+1:0;
+    if(![1,2,3,4,5,6].includes(zone))return {zone:null,source:'unknown',tacticalContext:null};
+    return {zone,source:'tactical-reference',tacticalContext:{rotation:(context.positions||[]).indexOf(id)+1||null,zone,source:context.source,tactical:true}};
+  }
   function attackDirection(origin,destination,type){
     if(origin===4){if([4,5].includes(destination))return 'diagonal';if(destination===1)return 'paralela';if(destination===6)return type==='tip'?'olla':'paralela';}
     if(origin===2){if([1,2].includes(destination))return 'diagonal';if(destination===5)return 'paralela';if(destination===6)return type==='tip'?'olla':'paralela';}
@@ -129,7 +134,7 @@ const VolleyRally = (() => {
     if(s==='block')return {side:action.metadata?.relatedAttackOutcome==='covered_block'?other(team):team,skill:'defense',coverage:action.metadata?.relatedAttackOutcome==='covered_block'};
     return null;
   }
-  return {side,other,skill,roster,positions,receptionContext,receptionSuggestion,receptionZone,zoneStatus,attackDirection,serveDirection,spatial,relink,next};
+  return {side,other,skill,roster,positions,receptionContext,receptionSuggestion,receptionZone,defenseSuggestion,zoneStatus,attackDirection,serveDirection,spatial,relink,next};
 })();
 
 // Rotation is the official order. A tactical layout is a separate, reversible
@@ -156,6 +161,8 @@ const VolleyCourt = (() => {
       const servingMiddle=s.serve===side&&middles.includes(raw[0]);
       if(s.finished||current&&(![1,5,6].includes(pos)||pos===1&&s.serve===side)||servingMiddle){next=null;reason=servingMiddle?'central-serving':'front-or-finished';}
       const held=s.liberoManual?.[side]?.boundary===boundary(s,side);
+      const replacedRole=current?role(roster.find(p=>p.id===current.replacedId)):null;
+      if(current&&(!roster.some(p=>p.id===current.playerId&&p.isLibero)||raw.includes(current.playerId)||!held&&replacedRole&&replacedRole!=='middle')){next=null;reason='role-correction';}
       if(!held&&m.liberoAuto?.[side]!==false&&!s.finished&&!servingMiddle){
         const candidates=middles.filter(id=>[1,5,6].includes(raw.indexOf(id)+1)&&!(raw.indexOf(id)===0&&s.serve===side));
         const eligible=roster.filter(p=>p.isLibero&&!raw.includes(p.id));
@@ -341,6 +348,9 @@ const VolleyEngine = (() => {
     else {
       const input={...action,...patch,id:action.id,metadata:{...action.metadata,...patch.metadata},attackRoleOverride:action.metadata?.attackRoleSource==='manual'?action.attackRole:'auto'};
       if(action.skill==='reception'&&(input.playerId!==action.playerId||input.metadata.receptionContext?.scheme!==action.metadata?.receptionContext?.scheme)&&input.originZone===action.originZone&&input.metadata.originSource!=='observed'){const guess=input.metadata.receptionContext?VolleyRally.receptionSuggestion(input.metadata.receptionContext,input.playerId):{zone:null,source:'unknown'};input.originZone=guess.zone;input.metadata.originSource=guess.source;}
+      if(action.skill==='defense'&&input.playerId!==action.playerId&&input.originZone===action.originZone&&input.metadata.originSource!=='observed'){
+        const guess=VolleyRally.defenseSuggestion(input.metadata.defenseContext,input.playerId);input.originZone=guess.zone;input.metadata.originSource=guess.source;input.metadata.tacticalContext=guess.tacticalContext;
+      }
       const created=createAction(input,{match,set:context,actions:updated.slice(0,index),mode:action.mode});
       if(created.error)return created;
       updated[index]={...created.action,timestamp:action.timestamp};

@@ -1,4 +1,7 @@
 'use strict';
+function rivalDesignationUsed(match,id){
+  return (match?.sets||[]).some(s=>s.opponentLineup?.current?.some(p=>p.id===id)||s.opponentLineup?.initial?.some(p=>p.id===id)||s.opponentLineup?.libero?.playerId===id||s.changes?.some(c=>c.side==='them'&&(c.incoming===id||c.outgoing===id))||s.rallies.some(r=>r.actions.some(a=>a.playerId===id)||r.opponentBefore?.libero?.playerId===id||r.before?.opponentLineup?.libero?.playerId===id));
+}
 function renderCourtControls(m){
   const s=activeSet();
   if(!VolleyCourt.enabled(m,s))return `<section class="card"><h2>Líbero automático y posiciones tácticas</h2><p>Activá estas mejoras para las próximas jugadas. Las acciones anteriores se conservan.</p><button class="btn btn-primary" data-action="court-enable">Activar mejoras de cancha</button></section>`;
@@ -58,7 +61,7 @@ document.addEventListener('change',e=>{
   if(t.matches('[data-flow-draft-role]')){setupDraft.opponentFormation ||= Array.from({length:6},()=>({number:'',name:''}));setupDraft.opponentFormation[+t.dataset.flowDraftRole].position=t.value;}
   if(t.matches('[data-flow-bench]')){const p=setupDraft.rivalBench?.[+t.dataset.flowBench];if(p&&['number','name','position'].includes(t.dataset.prop))p[t.dataset.prop]=t.value;}
   if(t.matches('[data-flow-setup-scheme]'))setupDraft.receptionScheme=t.checked;
-  if(t.matches('[data-flow-scheme]')&&m){m.receptionScheme=t.checked;save();render();}
+  if(t.matches('[data-flow-scheme]')&&m){m.receptionScheme=t.checked;if(flowEnabled()&&selectedSkill==='reception'&&activeSide==='us'&&editingActionIndex===null&&flowOriginSource!=='observed')prepareFlowInputs();save();render();}
   if(t.matches('[data-flow-rival]')&&m){
     const p=m.rivalPlayers.find(p=>p.id===t.dataset.flowRival);if(!p)return;
     const key=t.dataset.prop,value=t.value.trim();
@@ -66,7 +69,7 @@ document.addEventListener('change',e=>{
     if(!['number','name','position'].includes(key))return;
     if(key==='position'&&!['',...Object.keys(attackPositions)].includes(value))return;
     if(key==='position'&&value==='libero'&&m.rivalPlayers.filter(q=>q.isLibero&&q!==p).length>=2){toast('Hasta dos líberos rivales.');render();return;}
-    if(key==='position'&&(p.isLibero!== (value==='libero'))&&m.sets.some(s=>s.rallies.some(r=>r.actions.some(a=>a.playerId===p.id))||VolleyRally.positions(s,'them',false).includes(p.id))){toast('Para cambiar la designación de líbero, usá un jugador sin participación y fuera de la formación.');render();return;}
+    if(key==='position'&&(p.isLibero!== (value==='libero'))&&rivalDesignationUsed(m,p.id)){toast('Para cambiar la designación de líbero, usá un jugador sin participación y fuera de la formación.');render();return;}
     p[key]=value;if(key==='number')p.provisional=false;if(key==='position'){p.isLibero=value==='libero';delete p.attackPosition;}if(!pending.length){VolleyCourt.sync(m,activeSet());if(VolleyCourt.enabled(m,activeSet()))beginRallyFlow();}save();render();
   }
   if(t.matches('[data-flow-lineup]')&&m){const pos=+t.dataset.flowLineup,id=t.value;

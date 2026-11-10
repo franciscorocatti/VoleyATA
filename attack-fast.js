@@ -54,7 +54,7 @@ function assignPlayerPosition(player,value,match=null){
   if(match?.rivalPlayers?.includes(player)){
     const libero=value==='libero';
     if(!!player.isLibero!==libero){
-      if(match.sets.some(s=>s.opponentLineup?.current.some(p=>p.id===player.id)||s.rallies.some(r=>r.actions.some(a=>a.playerId===player.id)))){toast('La designación de líbero rival se conserva una vez que participó o ingresó en formación.');return false;}
+      if(rivalDesignationUsed(match,player.id)){toast('La designación de líbero rival se conserva una vez que participó o ingresó en formación.');return false;}
       if(libero&&match.rivalPlayers.filter(p=>p!==player&&p.isLibero).length>=2){toast('Hasta dos líberos rivales.');return false;}
     }
     player.position=value;player.isLibero=libero;delete player.attackPosition;if(typeof pending!=='undefined'&&!pending.length)VolleyCourt.sync(match,activeSet());

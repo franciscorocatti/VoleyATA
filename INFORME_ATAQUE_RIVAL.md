@@ -1,3 +1,5 @@
+> Informe de la entrega anterior. Para los cambios actuales, ver INFORME_ATAQUES_BLOQUEOS.md.
+
 # Volley Scout — Etapa 2
 
 Implementación local sobre la aplicación existente. No se publicó el sitio ni se actualizó la implementación remota de Google Apps Script.

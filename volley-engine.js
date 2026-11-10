@@ -10,7 +10,7 @@ const VolleyCatalog = (() => {
     defense:{name:'Defensa',outcomes:[o('perfect','Perfecta','Perfecta'),o('positive','Positiva','Positiva'),o('limited','Limitada','Negativa'),o('direct_error','Error directo','Error','them')]},
     setting:{name:'Armado',outcomes:[o('perfect','Perfecto','Perfecta'),o('good','Bueno','Positiva'),o('forced','Forzado','Negativa'),o('direct_error','Error directo','Error','them')]}
   };
-  function find(skill,result) { if(skill==='rival_attack'){const r=({kill:{label:'PUNTO RIVAL',winner:'them'},continue:{label:'SIGUE / DEFENDIDO',winner:null},error:{label:'ERROR RIVAL',winner:'us'},blocked_point:{label:'BLOQUEO NUESTRO',winner:'us'}})[result];return r?{id:result,legacy:r.label,...r}:null;}return definitions[skill]?.outcomes.find(o=>o.id===result||o.label===result||o.legacy===result)||null; }
+  function find(skill,result) { if(skill==='rival_attack'){const r=({kill:{label:'PUNTO RIVAL',winner:'them'},continue:{label:'SIGUE / DEFENDIDO',winner:null},error:{label:'ERROR RIVAL',winner:'us'},blocked_point:{label:'BLOQUEO NUESTRO',winner:'us'},covered_block:{label:'BLOQUEO NUESTRO · SIGUE',winner:null}})[result];return r?{id:result,legacy:r.label,...r}:null;}return definitions[skill]?.outcomes.find(o=>o.id===result||o.label===result||o.legacy===result)||null; }
   function outcome(action,rally) {
     const adapted=typeof VolleyData!=='undefined'?VolleyData.getActionResult(action,rally):null;
     const result=find(action.skill,action.outcomeId||adapted?.outcomeId||action.outcome);return action.skill==='rival_attack'&&action.metadata?.linkedOwnBlockActionId&&result?{...result,winner:null}:result;
@@ -40,11 +40,12 @@ const VolleyEngine = (() => {
     if(!repetition&&input.skill==='block'&&participants.some(id=>match.players.find(p=>p.id===id)?.isLibero))return {error:'El líbero no puede participar del bloqueo.'};
     const metadata={...(input.metadata||{})};
     if(input.skill==='attack') {
+      if(typeof playerPosition==='function')metadata.playerPosition=playerPosition(player);
       if(['use_block_out','tip_kill','tip_continue'].includes(definition.id)) {
         if(metadata.freeBall||input.isFreeBall||['free_ball','freeball'].includes(metadata.attackType))return {error:'Use y colocada deben ser acciones ofensivas dirigidas al campo rival, no pelotas de continuidad.'};
         metadata.attackType=definition.id==='use_block_out'?'use_block_out':'tip';
-      } else if(['kill','continue'].includes(definition.id)) {
-        if(!['free_ball','freeball'].includes(metadata.attackType))metadata.attackType='conventional';
+      } else if(['kill','continue','covered_block','blocked_point','error'].includes(definition.id)) {
+        if(!['free_ball','freeball'].includes(metadata.attackType))metadata.attackType=definition.id==='error'&&metadata.attackType==='tip'?'tip':'conventional';
       }
       else if(definition.id!=='error'&&['use_block_out','tip','conventional'].includes(metadata.attackType)) delete metadata.attackType;
     }
@@ -95,7 +96,7 @@ const VolleyEngine = (() => {
     if (actions.some(a=>!(a.skill==='rival_attack'?(match.rivalPlayers||[]):match.players).some(p=>p.id===a.playerId))) return {error:'Hay una acción atribuida a un jugador inexistente.'};
     for(let i=0;i<actions.length;i++){
       const action=actions[i],previous=actions.slice(0,i);
-      if(action.skill==='rival_attack'){if(!['kill','continue','error','blocked_point'].includes(action.outcomeId))return {error:'Resultado rival inválido.'};if(action.metadata?.linkedOwnBlockActionId&&(action.outcomeId!=='blocked_point'||!actions.slice(i+1).some(b=>b.id===action.metadata.linkedOwnBlockActionId&&b.skill==='block'&&b.outcomeId==='point')))return {error:'El bloqueo propio asociado ya no existe.'};continue;}
+      if(action.skill==='rival_attack'){if(!['kill','continue','error','blocked_point','covered_block'].includes(action.outcomeId))return {error:'Resultado rival inválido.'};if(action.metadata?.linkedOwnBlockActionId&&(!['blocked_point','covered_block'].includes(action.outcomeId)||!actions.slice(i+1).some(b=>b.id===action.metadata.linkedOwnBlockActionId&&b.skill==='block'&&b.outcomeId===(action.outcomeId==='blocked_point'?'point':'positive_touch'))))return {error:'El bloqueo propio asociado ya no existe.'};continue;}
       if(!onCourt(set).includes(action.playerId))return {error:'Hay una acción pendiente de un jugador fuera de cancha. Corregila antes de cerrar.'};
       if(action.skill==='serve'&&(set.serve!=='us'||i!==0))return {error:'La secuencia contiene un saque que no corresponde al servicio inicial.'};
       if(action.skill==='reception'&&(set.serve!=='them'||previous.some(a=>['serve','reception','attack','defense','rival_attack'].includes(a.skill))))return {error:'La recepción pendiente no corresponde al saque rival. Revisá la secuencia.'};

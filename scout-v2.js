@@ -34,7 +34,7 @@ function restoreScoutDraft() {
   pending=draft?.actions?structuredCloneSafe(draft.actions):[];
   openRallyId=draft?.id||uid();
   selectedPlayerId=draft?.selectedPlayerId||null;selectedSkill=skills[draft?.selectedSkill]?draft.selectedSkill:'attack';
-  attackDirection=draft?.attackDirection??null;attackDirectionSkipped=draft?.attackDirectionSkipped===true;attackType=draft?.attackType||'conventional';originZone=draft?.originZone??null;destinationZone=draft?.destinationZone??null;selectedZone=null;
+  attackOriginManual=draft?.attackOriginManual===true;attackDirection=draft?.attackDirection??null;attackDirectionSkipped=draft?.attackDirectionSkipped===true;attackType=draft?.attackType||'conventional';originZone=draft?.originZone??null;destinationZone=draft?.destinationZone??null;selectedZone=null;
   pointCause=draft?.pointCause||null;sequenceComplete=draft?.sequenceComplete===true;
   editingActionIndex=null;awaitingBlockerIndex=draft?.awaitingBlockerIndex??null;ownBlockers=draft?.ownBlockers||[];settingTarget=draft?.settingTarget||'';receiverId=draft?.receiverId||'';
   useBlockerDraft={...(draft?.useBlockerDraft||{}),skill:'attack',outcomeId:'use_block_out'};attackRoleOverride=draft?.attackRoleOverride||'auto';quickCausesOpen=false;
@@ -43,10 +43,10 @@ function persistScoutDraft() {
   const s=activeSet();if (!s) return;
   state.openRallies ||= {};
   state.openRallies[s.id]={id:openRallyId||uid(),actions:structuredCloneSafe(pending),mode:scoutMode,selectedPlayerId,selectedSkill,
-    rivalDraft:structuredCloneSafe(rivalDraft),originZone,destinationZone,pointCause,sequenceComplete,awaitingBlockerIndex,ownBlockers,settingTarget,receiverId,attackRoleOverride,attackDirection,attackDirectionSkipped,attackType,useBlockerDraft:structuredCloneSafe(useBlockerDraft)};
+    rivalDraft:structuredCloneSafe(rivalDraft),originZone,destinationZone,pointCause,sequenceComplete,awaitingBlockerIndex,ownBlockers,settingTarget,receiverId,attackRoleOverride,attackOriginManual,attackDirection,attackDirectionSkipped,attackType,useBlockerDraft:structuredCloneSafe(useBlockerDraft)};
   state.preferences={...state.preferences,mode:scoutMode,autoClose:autoClosePoints};
 }
-function resetActionInputs() {attackDirection=null;attackDirectionSkipped=false;attackType='conventional';attackRoleOverride='auto';originZone=null;destinationZone=null;selectedZone=null;ownBlockers=[];settingTarget='';receiverId='';useBlockerDraft={skill:'attack',outcomeId:'use_block_out'};editingActionIndex=null;zonePickerOpen=false;}
+function resetActionInputs() {attackOriginManual=false;attackDirection=null;attackDirectionSkipped=false;attackType='conventional';attackRoleOverride='auto';originZone=null;destinationZone=null;selectedZone=null;ownBlockers=[];settingTarget='';receiverId='';useBlockerDraft={skill:'attack',outcomeId:'use_block_out'};editingActionIndex=null;zonePickerOpen=false;}
 function scoutActionLabel(action,rally) {
   if(action.skill==='rival_attack')return rivalAttackLabel(activeMatch(),action);
   const result=VolleyCatalog.outcome(action,rally);
@@ -67,7 +67,7 @@ function renderScoutZones() {
   return `<button class="btn v2-zone-toggle" data-action="toggle-zone" aria-expanded="${zonePickerOpen}" aria-controls="v2-zone-options">${originZone||destinationZone?`Zonas: ${originZone?'origen '+originZone:''} ${destinationZone?'destino '+destinationZone:''}`:'Zonas opcionales · sin registrar'} <span>${zonePickerOpen?'▴':'▾'}</span></button><div id="v2-zone-options" class="v2-zones ${zonePickerOpen?'is-open':''}">${body}<p class="hinttext">Solo se guarda una zona si la seleccionás.</p></div>`;
 }
 function renderScoutExtras(m,s) {
-  if(selectedSkill==='attack')return attackType==='use_block_out'?renderRivalBlockerFields(m,useBlockerDraft,-1):'';
+  if(selectedSkill==='attack')return attackType==='use_block_out'?renderRivalBlockerFields(m,useBlockerDraft,-1):`<details class="v2-extra"><summary>Bloqueadores rivales · opcional</summary>${renderRivalBlockerFields(m,useBlockerDraft,-1)}</details>`;
   if (scoutMode!=='advanced') return '';
   if (selectedSkill==='attack') return `<details class="v2-extra"><summary>Use / block-out · bloqueador rival (opcional)</summary>${renderRivalBlockerFields(m,useBlockerDraft,-1)}</details>`;
   const current=courtPlayers(s),players=m.players.filter(p=>current.includes(p.id));
@@ -80,7 +80,7 @@ function renderPendingV2(m) {
   return `<div id="rally-current" class="card v2-pending"><div class="section-head"><h2>Rally actual</h2><span class="pill">${pending.length} acciones</span></div>${pending.length?`<ol class="v2-action-list">${pending.map((a,i)=>`<li><span><strong>${esc(a.skill==='rival_attack'?'Rival #'+(rivalPlayer(m,a.playerId)?.number||'?'):pname(m,a.playerId))}</strong><br>${esc(scoutActionLabel(a))}<small>${a.originZone?' · origen '+a.originZone:''}${a.destinationZone?' · destino '+a.destinationZone:''}</small></span>${a.skill==='rival_attack'?'':`<button class="btn btn-small" data-action="v2-edit" data-index="${i}">Editar</button>`}<button class="btn btn-small btn-danger" data-action="remove-draft" data-index="${i}" aria-label="Quitar acción ${i+1}">×</button></li>`).join('')}</ol>`:'<p class="hinttext">Podés sumar un punto sin atribuirlo a un jugador.</p>'}
   ${scoutMode==='advanced'?`<label class="row"><input type="checkbox" data-v2-field="sequenceComplete" ${sequenceComplete?'checked':''}>Registré la secuencia completa de este rally</label>`:'<small>Modo rápido: muestra parcial de acciones.</small>'}
   <div class="field" style="margin-top:10px"><label for="point-cause">Causa del punto (opcional, sin atribución individual)</label><select id="point-cause" data-v2-field="pointCause"><option value="">Sin identificar</option>${Object.entries(SCOUT_CAUSES).map(([value,label])=>`<option value="${value}" ${pointCause===value?'selected':''}>${label}</option>`).join('')}</select></div>
-  ${renderBlockerPickers(m)}${awaitingBlockerIndex!==null?'<p class="callout">Podés identificar al bloqueador antes de cerrar.</p><button class="btn btn-primary" data-action="v2-confirm-block">Guardar bloqueo y cerrar punto rival</button>':''}
+  ${renderBlockerPickers(m)}
   <div class="row" style="margin-top:10px"><button class="btn btn-small" data-action="remove-last-draft" ${!pending.length?'disabled':''}>Quitar última acción</button><button class="btn btn-small" data-action="undo-rally" ${!activeSet()?.rallies.length?'disabled':''}>Deshacer último punto</button><button class="btn btn-small" data-action="v2-correct-winner" ${!activeSet()?.rallies.length?'disabled':''}>Corregir ganador anterior</button></div></div>`;
 }
 function renderScoutV2(m) {
@@ -89,7 +89,7 @@ function renderScoutV2(m) {
   ${s.finished?`<div class="callout v2-finished">Set finalizado. ${ended?'Partido terminado.':'Revisá la formación del próximo set.'}<div class="row">${!ended?'<button class="btn btn-primary" data-action="next-set">Siguiente set</button>':''}<button class="btn" data-action="coach-open">Informe del entrenador</button><button class="btn" data-action="undo-rally">Corregir último punto</button></div></div>`:''}
   ${renderRivalAccess(m)}<div class="v2-console"><div class="card v2-player-card"><div class="section-head"><h2>Jugador</h2><button class="btn btn-small" data-action="view" data-view="settings">Cambios / líbero</button></div><div class="player-grid live-court-grid" data-court-side="us">${[4,3,2,5,6,1].map(pos=>{const id=courtPlayers(s)[pos-1],p=playerById(m,id);return `<button class="player ${selectedPlayerId===id?'selected':''} ${p?.isLibero?'is-libero':''}" data-action="select-player" data-player="${esc(id)}" data-court-player="${esc(id)}" aria-pressed="${selectedPlayerId===id}"><span class="jersey">${esc(p?.number||'?')}</span><span class="v2-player-copy"><span class="playername">${esc(p?.name||'Sin jugador')}</span><span class="playerpos">P${pos}${p?.isLibero?' · LÍBERO':''}</span></span></button>`}).join('')}</div><p class="hinttext">Red ↑ · posiciones 4–3–2 / 5–6–1</p></div>
   <div class="card v2-entry-card"><div class="v2-skills" role="group" aria-label="Fundamento">${Object.entries(VolleyCatalog.definitions).map(([key,value])=>`<button class="skill ${key===selectedSkill?'selected':''}" data-action="select-skill" data-skill="${key}" aria-pressed="${key===selectedSkill}">${scoutIcon(key)}<span>${value.name}</span></button>`).join('')}</div><div class="v2-selected"><strong>${selectedPlayerId?esc(pname(m,selectedPlayerId)):'Elegí un jugador'}</strong><small>${esc(definition.name)}${editingActionIndex!==null?' · editando acción '+(editingActionIndex+1):''}</small></div>
-  ${selectedSkill==='attack'?renderAttackControls():''}<div class="outcome-grid v2-outcomes">${definition.outcomes.filter(out=>selectedSkill!=='attack'||attackOutcomeVisible(out)).map(out=>`<button class="outcome ${out.winner==='us'?'good':out.winner==='them'?'bad':'neutral'}" data-action="v2-result" data-result="${out.id}" ${s.finished?'disabled':''}><span aria-hidden="true">${out.winner==='us'?'✓':out.winner==='them'?'×':'↻'}</span>${out.label}</button>`).join('')}</div>
+  ${awaitingBlockerIndex!==null?`<div class="inline-block-confirm">${renderRivalBlockerFields(m,pending[awaitingBlockerIndex],awaitingBlockerIndex)}<button class="btn btn-primary" data-action="v2-confirm-block">Guardar bloqueo · punto rival</button></div>`:''}${selectedSkill==='attack'?renderAttackControls():''}<div class="outcome-grid v2-outcomes">${definition.outcomes.filter(out=>selectedSkill!=='attack'||attackOutcomeVisible(out)).map(out=>`<button class="outcome ${out.winner==='us'?'good':out.winner==='them'?'bad':'neutral'}" data-action="v2-result" data-result="${out.id}" ${s.finished?'disabled':''}><span aria-hidden="true">${out.winner==='us'?'✓':out.winner==='them'?'×':'↻'}</span>${out.label}</button>`).join('')}</div>
   ${editingActionIndex!==null?'<button class="btn btn-small" data-action="v2-edit-cancel">Cancelar edición</button>':''}${selectedSkill==='attack'?'<p class="hinttext">Toque / colocada: solo una acción ofensiva dirigida al campo rival.</p>':''}${renderScoutZones()}${renderScoutExtras(m,s)}<p class="hinttext">${scoutMode==='advanced'?'Las pelotas gratuitas no se registran como ataques. ':''}${autoClosePoints?'✓ / × cierran el punto automáticamente; ↻ continúa el rally.':'El cierre automático está desactivado. Usá los botones de punto.'}</p></div></div>
   ${renderPendingV2(m)}<details class="card v2-history"><summary>Últimos puntos · ${s.rallies.length} disputados</summary><div class="history">${s.rallies.slice(-8).reverse().map(r=>`<div class="history-row"><div><strong>${r.scoreBefore.us+(r.winner==='us'?1:0)}–${r.scoreBefore.them+(r.winner==='them'?1:0)} · ${esc(r.winner==='us'?m.team:m.opponent)}</strong><br><small>R${r.rotation} · ${r.mode==='advanced'?'Avanzado':r.mode==='quick'?'Rápido':'Registro anterior'} · ${r.actions.length?r.actions.map(a=>esc(scoutActionLabel(a,r))).join(' → '):esc(SCOUT_CAUSES[r.cause]||'Sin acción individual')}</small></div></div>`).join('')||'<p class="hinttext">Sin puntos todavía.</p>'}</div></details>
   ${!s.finished?`<footer class="v2-point-dock no-print">${renderQuickCausePanel()}<div class="v2-dock-top"><button class="btn btn-small" data-action="v2-smart-undo">↶ Deshacer</button><span>${pending.length?esc(scoutActionLabel(pending.at(-1))):'Sin acciones pendientes'}</span><button class="btn btn-small" data-action="v2-current-rally">Rally (${pending.length})</button></div><div class="rally-buttons ${scoutMode==='quick'?'v21-with-causes':''}"><button class="rally-btn us" data-action="finish-rally" data-winner="us">+ Punto · ${esc(m.team)}</button><button class="rally-btn them" data-action="finish-rally" data-winner="them">+ Punto · ${esc(m.opponent)}</button>${scoutMode==='quick'?'<button class="btn v21-cause-toggle" data-action="v21-cause-toggle" aria-label="Cómo nos hicieron el punto">Con causa ▴</button>':''}</div></footer>`:''}</section>`;
@@ -102,9 +102,9 @@ function addScoutAction(result,input={}) {
   const previousMetadata={...(previous?.metadata||{})};
   delete previousMetadata.attackPhase;delete previousMetadata.setterId;
   const useBlocker=selectedSkill==='attack'&&['use_block_out','blocked_point','covered_block'].includes(result)?useBlockerDraft:null;
-  if(previous?.outcomeId==='use_block_out'||useBlocker)delete previousMetadata.rivalBlockers;
+  if(isRivalBlockContact(previous)||useBlocker){delete previousMetadata.rivalBlockers;delete previousMetadata.rivalBlockerRoles;delete previousMetadata.rivalBlockerUnidentified;}
   const created=VolleyEngine.createAction({id:previous?.id,playerId:selectedPlayerId,skill:selectedSkill,outcomeId:result,
-    originZone:selectedSkill==='attack'?(originZone??defaultAttackOrigin()):originZone,destinationZone,attackRoleOverride,participants:ownBlockers,blocker:useBlocker?useBlocker.blocker:previous?.outcomeId==='use_block_out'?null:previous?.blocker,metadata:{...previousMetadata,...(selectedSkill==='attack'?{attackDirection,attackType:result==='error'?attackType:previousMetadata.attackType}:{}),...(useBlocker?{rivalBlockers:rivalBlockers(useBlocker)}:{}),settingTarget:settingTarget||null,receiverId:receiverId||null},...input},
+    originZone:selectedSkill==='attack'?(attackOriginManual?originZone:originZone??defaultAttackOrigin()):originZone,destinationZone,attackRoleOverride,participants:ownBlockers,blocker:useBlocker?useBlocker.blocker:isRivalBlockContact(previous)?null:previous?.blocker,metadata:{...previousMetadata,...(selectedSkill==='attack'?{attackDirection,playerPosition:playerPosition(playerById(m,selectedPlayerId)),attackType}:{}),...(useBlocker?{rivalBlockers:rivalBlockers(useBlocker),rivalBlockerRoles:useBlocker.metadata?.rivalBlockerRoles||[],rivalBlockerUnidentified:useBlocker.metadata?.rivalBlockerUnidentified===true}:{}),settingTarget:settingTarget||null,receiverId:receiverId||null},...input},
     {match:m,set:s,actions:base,mode:scoutMode});
   if (created.error) {toast(created.error);return false;}
   if (edit!==null&&created.terminalWinner&&edit!==pending.length-1) {toast('Una acción terminal debe ser la última. Quitá primero las acciones posteriores.');return false;}
@@ -112,7 +112,7 @@ function addScoutAction(result,input={}) {
   if (edit!==null) pending[edit]=created.action;else pending.push(created.action);
   pending.forEach((a,i)=>{if(a.schemaVersion===2)a.order=i+1;});
   awaitingBlockerIndex=null;resetActionInputs();
-  if (created.action.outcomeId==='blocked_point'&&autoClosePoints) {awaitingBlockerIndex=edit??pending.length-1;save();render();return true;}
+  if (created.action.outcomeId==='blocked_point'&&created.action.attackRole!=='back'&&autoClosePoints) {awaitingBlockerIndex=edit??pending.length-1;save();render();return true;}
   const locallySaved=save();
   if (created.terminalWinner&&autoClosePoints) return finishRally(created.terminalWinner,{automatic:true});
   render();toast(locallySaved?scoutActionLabel(created.action)+' · acción guardada':'Acción en memoria. Descargá una copia; no se pudo guardar.');return true;
@@ -167,11 +167,11 @@ function handleScoutAction(action,t) {
   if(action==='v2-mode'){scoutMode=t.dataset.mode==='advanced'?'advanced':'quick';save();render();}
   if(action==='v2-zone'||action==='v2-zone-clear'){
     const value=action==='v2-zone-clear'?null:+t.dataset.zone;
-    if(t.dataset.kind==='origin'){originZone=value;setRivalBlockers(useBlockerDraft,[]);}else destinationZone=value;save();render();
+    if(t.dataset.kind==='origin'){originZone=value;attackOriginManual=true;resetRivalBlockerSelection(useBlockerDraft);}else destinationZone=value;save();render();
   }
   if(action==='v2-edit'){
     const index=+t.dataset.index,a=pending[index];if(!a)return true;
-    attackDirection=a.metadata?.attackDirection??null;attackDirectionSkipped=!attackDirection;attackType=a.metadata?.attackType||'conventional';editingActionIndex=index;selectedPlayerId=a.playerId;selectedSkill=a.skill;originZone=a.originZone??null;destinationZone=a.destinationZone??null;
+    attackDirection=a.metadata?.attackDirection??null;attackDirectionSkipped=!attackDirection;attackType=a.metadata?.attackType||'conventional';attackOriginManual=true;editingActionIndex=index;selectedPlayerId=a.playerId;selectedSkill=a.skill;originZone=a.originZone??null;destinationZone=a.destinationZone??null;
     ownBlockers=(a.participants||[]).filter(id=>id!==a.playerId);settingTarget=a.metadata?.settingTarget||'';receiverId=a.metadata?.receiverId||'';awaitingBlockerIndex=null;
     useBlockerDraft=a.outcomeId==='use_block_out'?structuredCloneSafe(a):{skill:'attack',outcomeId:'use_block_out'};attackRoleOverride=a.metadata?.attackRoleSource==='manual'?a.attackRole:'auto';render();
   }

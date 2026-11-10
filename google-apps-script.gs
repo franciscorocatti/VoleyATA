@@ -16,7 +16,7 @@ const SHEET_DEFINITIONS = [
   ['ralliesV2','Volley Rallies V2',['ID partido','ID set','Set','ID rally','Número rally','Versión esquema','Estado','Modo','Causa punto','Servicio previo ID','Ganador ID','Puntos equipo antes','Puntos rival antes','Rotación previa','Formación previa','Secuencia completa','Hora','Rally original JSON']]
 ];
 const OUTCOMES_V2 = {
-  rival_attack:{kill:'Punto rival',continue:'Sigue / defendido',error:'Error rival',blocked_point:'Bloqueo nuestro'},
+  rival_attack:{kill:'Punto rival',continue:'Sigue / defendido',error:'Error rival',blocked_point:'Bloqueo nuestro',covered_block:'Bloqueo nuestro · sigue'},
   serve:{ace:'Ace',positive:'Positivo',neutral:'Continuidad',error:'Error'},
   reception:{perfect:'Perfecta',positive:'Positiva',poor:'Negativa',direct_error:'Error'},
   attack:{kill:'Punto',continue:'Continuidad',use_block_out:'Punto',tip_kill:'Punto',tip_continue:'Continuidad',covered_block:'Bloqueo cubierto',blocked_point:'Bloqueado',error:'Error',ambiguous_block:'Bloqueado histórico ambiguo'},

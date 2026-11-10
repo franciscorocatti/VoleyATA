@@ -15,7 +15,7 @@ function storeTeamTemplate(name, players, lineup, preferredId) {
   const templates = savedTeams();
   const existing = templates.find(t=>t.id === preferredId);
   const team = {id:existing?.id || uid(),name:name.trim(),updatedAt:new Date().toISOString(),
-    players:players.map(p=>({id:p.id,number:p.number.trim(),name:p.name.trim(),isLibero:!!p.isLibero})),lineup:[...lineup]};
+    players:players.map(p=>({id:p.id,number:p.number.trim(),name:p.name.trim(),isLibero:!!p.isLibero,attackPosition:playerPosition(p)})),lineup:[...lineup]};
   if (!validSavedTeam(team)) { toast('Completá el nombre del equipo y de los jugadores, con números distintos, al menos seis regulares y hasta dos líberos.'); return null; }
   const regular = team.players.filter(p=>!p.isLibero);
   const chosen = new Set();

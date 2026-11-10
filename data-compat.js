@@ -5,7 +5,7 @@
   const DEFAULT_KEY = 'volley_scout_avanzado_v1';
   const SKILLS = ['rival_attack','serve','reception','attack','block','defense','setting'];
   const RESULTS = {
-    rival_attack:['kill','continue','error','blocked_point'],
+    rival_attack:['kill','continue','error','blocked_point','covered_block'],
     serve:['ace','positive','neutral','error'],
     reception:['perfect','positive','poor','direct_error'],
     attack:['kill','continue','use_block_out','tip_kill','tip_continue','covered_block','blocked_point','error','ambiguous_block'],
@@ -14,7 +14,7 @@
     setting:['perfect','good','forced','direct_error']
   };
   const LABELS = {
-    rival_attack:{'PUNTO RIVAL':'kill','SIGUE / DEFENDIDO':'continue','ERROR RIVAL':'error','BLOQUEO NUESTRO':'blocked_point'},
+    rival_attack:{'PUNTO RIVAL':'kill','SIGUE / DEFENDIDO':'continue','ERROR RIVAL':'error','BLOQUEO NUESTRO':'blocked_point','BLOQUEO NUESTRO · SIGUE':'covered_block'},
     serve:{Ace:'ace',Positivo:'positive',Continuidad:'neutral',Neutro:'neutral',Error:'error'},
     reception:{Perfecta:'perfect',Positiva:'positive',Negativa:'poor',Mala:'poor',Error:'direct_error','Error directo':'direct_error'},
     attack:{Punto:'kill',Continuidad:'continue',Sigue:'continue','Bloqueo cubierto':'covered_block','Bloqueo punto':'blocked_point',Error:'error'},

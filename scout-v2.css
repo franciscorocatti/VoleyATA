@@ -107,3 +107,5 @@
 .rival-access{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.rival-access>.btn{flex:1;min-height:48px}.rival-players .btn{display:flex;flex-direction:column;align-items:center}.rival-players strong{font-size:24px}.rival-players small{color:inherit}.rival-results{display:grid;grid-template-columns:1fr 1fr}.rival-trend{margin:10px 0;padding:12px}.has-rival-panel>.v2-live-head{position:sticky;top:0;z-index:20;background:var(--bg);padding:8px}.rival-entry input[type=checkbox]{width:20px;min-height:20px}.rival-entry fieldset{margin-top:12px}
 
 .rival-trend-compact p{margin:4px 0}.rival-trend-compact p br{display:none}.rival-trend-compact p strong{margin-right:8px}.rival-trend-compact small{display:none}
+
+.block-suggested{border:2px dashed var(--primary);background:var(--primary-soft)}.inline-block-confirm{padding:12px;margin:10px 0;border:2px solid var(--primary);border-radius:12px}.attack-position-label{display:block;margin:6px 0}.roster-position{display:block;margin:8px 0}.inline-block-confirm input[type=checkbox]{width:20px;min-height:20px}.attack-fast[aria-label="Origen"]>.btn,.attack-fast[aria-label="Origen rival habitual"]>.btn{min-height:56px}

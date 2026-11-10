@@ -20,11 +20,11 @@ function blockerText(action) {
   return blockers.length ? ' · bloqueo rival '+blockers.map(p=>(p.number ? '#'+p.number : '')+(p.name ? ' '+p.name : '')).join(' + ') : '';
 }
 function renderRivalBlockerFields(match,action,index) {
-  const candidates=activeSet()?.opponentLineup?.current || [],blockers=rivalBlockers(action),blocker=action.blocker || blockers[0] || {};
-  return `<div class="subtle" style="margin-top:12px">${attackSuggestions(action,index)}<h3>${action.outcomeId==='use_block_out'?'Use / block-out':'Ataque bloqueado'} · ${esc(pname(match,action.playerId||selectedPlayerId))}</h3><p class="hinttext">¿Quién bloqueó del rival? Opcional; podés marcar más de uno.</p><div class="row" role="group" aria-label="Bloqueadores rivales">${candidates.filter(p=>p.number).map(p=>`<label class="tag rival-blocker-option" style="display:inline-flex;align-items:center;gap:6px;min-height:44px"><input type="checkbox" style="width:18px;min-height:18px;height:18px;padding:0" data-rival-blocker-choice="${index}" value="${esc(p.number)}" ${blockers.some(b=>b.number === String(p.number)) ? 'checked' : ''}> #${esc(p.number)} ${esc(p.name || '')}</label>`).join('') || '<small>Sin formación rival: ingresá el bloqueador manualmente.</small>'}</div><div class="grid-2" style="margin-top:10px"><div class="field"><label for="blocker-number-${index}">Número rival</label><input id="blocker-number-${index}" maxlength="3" placeholder="N°" data-blocker-field="number" data-blocker-index="${index}" value="${esc(blocker.number || '')}"></div><div class="field"><label for="blocker-name-${index}">Nombre rival (opcional)</label><input id="blocker-name-${index}" maxlength="50" placeholder="Nombre" data-blocker-field="name" data-blocker-index="${index}" value="${esc(blocker.name || '')}"></div></div><p class="hinttext">La identificación no suma otro punto. ${action.outcomeId==='use_block_out'?'El use suma un kill nuestro; no suma un bloqueo rival.':action.outcomeId === 'covered_block' ? 'El bloqueo cubierto mantiene la jugada abierta.' : 'Si fue bloqueo punto, el rally lo gana el rival.'}</p></div>`;
+  const candidates=[...(typeof rivalRoster==='function'?rivalRoster(match):[]),...(activeSet()?.opponentLineup?.current||[])].filter((p,i,all)=>all.findIndex(x=>x.number===p.number)===i),blockers=rivalBlockers(action),blocker=action.blocker || blockers[0] || {};
+  return `<div class="subtle" style="margin-top:12px">${attackSuggestions(action,index)}<h3>${action.outcomeId==='use_block_out'?'Use / block-out':'Ataque bloqueado'} · ${esc(pname(match,action.playerId||selectedPlayerId))}</h3><details class="v2-extra"><summary>Otra camiseta / bloqueo múltiple</summary><p class="hinttext">¿Quién bloqueó del rival? Identificación opcional; hasta tres bloqueadores.</p><div class="row" role="group" aria-label="Bloqueadores rivales">${candidates.filter(p=>p.number).map(p=>`<label class="tag rival-blocker-option" style="display:inline-flex;align-items:center;gap:6px;min-height:44px"><input type="checkbox" style="width:18px;min-height:18px;height:18px;padding:0" data-rival-blocker-choice="${index}" value="${esc(p.number)}" ${blockers.some(b=>b.number === String(p.number)) ? 'checked' : ''}> #${esc(p.number)} ${esc(p.name || '')}</label>`).join('') || '<small>Podés identificar al bloqueador por camiseta o dejarlo sin identificar.</small>'}</div><div class="grid-2" style="margin-top:10px"><div class="field"><label for="blocker-number-${index}">Número rival</label><input id="blocker-number-${index}" maxlength="3" placeholder="N°" data-blocker-field="number" data-blocker-index="${index}" value="${esc(blocker.number || '')}"></div><div class="field"><label for="blocker-name-${index}">Nombre rival (opcional)</label><input id="blocker-name-${index}" maxlength="50" placeholder="Nombre" data-blocker-field="name" data-blocker-index="${index}" value="${esc(blocker.name || '')}"></div></div></details><p class="hinttext">La identificación no suma otro punto. ${action.outcomeId==='use_block_out'?'El use suma un kill nuestro; no suma un bloqueo rival.':action.outcomeId === 'covered_block' ? 'El bloqueo cubierto mantiene la jugada abierta.' : 'Si fue bloqueo punto, el rally lo gana el rival.'}</p></div>`;
 }
 function renderBlockerPickers(match) {
-  return pending.map((action,index)=>(isBlockedAttack(action)||(action.outcomeId==='use_block_out'&&scoutMode==='advanced')) ? renderRivalBlockerFields(match,action,index) : '').join('');
+  return pending.map((action,index)=>index!==awaitingBlockerIndex&&(isBlockedAttack(action)||(action.outcomeId==='use_block_out'&&scoutMode==='advanced')) ? renderRivalBlockerFields(match,action,index) : '').join('');
 }
 function getRivalBlockStats(match,filter='all') {
   const groups=new Map();let totalPoints=0;
@@ -35,7 +35,7 @@ function getRivalBlockStats(match,filter='all') {
     const result=typeof StatsV2 !== 'undefined' ? StatsV2.resolveOutcome(action,rally) : typeof VolleyData !== 'undefined' ? VolleyData.getActionResult(action,rally) : {outcomeId:action.outcomeId || 'blocked_point'};
     if (result.outcomeId !== 'blocked_point') continue;
     totalPoints++;
-    const known=rivalBlockers(action),blockers=known.length ? known : [{number:'',name:''}];
+    const known=rivalBlockers(action).filter(b=>b.number||!['Opuesto / Armador rival','Central rival','Punta rival'].includes(b.name)),blockers=known.length ? known : [{number:'',name:''}];
     for (const blocker of blockers) {
       const key=blocker.number || (blocker.name ? 'name:'+blocker.name : '');
       if (!groups.has(key)) groups.set(key,{number:blocker.number,name:blocker.name,points:0,soloPoints:0,assistedPoints:0,attackers:new Map()});
@@ -57,8 +57,9 @@ document.addEventListener('change',event=>{
   const t=event.target;
   if (t.matches('[data-rival-blocker-choice]')) {
     const action=rivalBlockerTarget(+t.dataset.rivalBlockerChoice);if (!isRivalBlockContact(action)) return;
-    const candidate=activeSet()?.opponentLineup?.current.find(p=>String(p.number) === t.value);if (!candidate) return;
+    const candidate=rivalRoster().find(p=>String(p.number)===t.value)||activeSet()?.opponentLineup?.current.find(p=>String(p.number) === t.value);if (!candidate) return;
     const blockers=rivalBlockers(action).filter(p=>p.number !== t.value);
+    if(t.checked&&blockers.length>=3){toast('Elegí hasta tres bloqueadores.');render();return;}
     if (t.checked) blockers.push({number:String(candidate.number),name:candidate.name || ''});
     setRivalBlockers(action,blockers);if (typeof save === 'function') save();render();
   }

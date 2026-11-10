@@ -1,0 +1,74 @@
+{
+  "verify-attack-blocks.cjs": {
+    "ok": true,
+    "checks": 31
+  },
+  "verify-rival-attack.cjs": {
+    "ok": true,
+    "checks": 27
+  },
+  "verify-attack-fast.cjs": {
+    "ok": true,
+    "checks": 62
+  },
+  "verify-training.cjs": {
+    "ok": true,
+    "checks": 49
+  },
+  "verify-engine-v2.cjs": {
+    "ok": true,
+    "checks": 25
+  },
+  "verify-v21.cjs": {
+    "ok": true,
+    "checks": 33
+  },
+  "verify-pwa.cjs": {
+    "ok": true,
+    "checks": 8
+  },
+  "verify-pwa-client.cjs": {
+    "ok": true,
+    "checks": 7
+  },
+  "verify-attack-variants.cjs": {
+    "ok": true,
+    "checks": 18
+  },
+  "verify-data-v2.cjs": {
+    "ok": true,
+    "checks": 15
+  },
+  "verify-stats-v2.cjs": {
+    "ok": true,
+    "checks": 10
+  },
+  "verify-stats-integration-v2.cjs": {
+    "ok": true,
+    "checks": 8
+  },
+  "verify-sheets-v2.cjs": {
+    "ok": true,
+    "checks": 10
+  },
+  "verify-auto-sync.cjs": {
+    "ok": true,
+    "checks": 11
+  },
+  "verify-team.cjs": {
+    "ok": true,
+    "checks": 14
+  },
+  "verify-rotation.cjs": {
+    "ok": true,
+    "checks": 4
+  },
+  "verify-sequence-stats.cjs": {
+    "ok": true,
+    "checks": 7
+  },
+  "verify-formation-stats.cjs": {
+    "ok": true,
+    "checks": 7
+  }
+}

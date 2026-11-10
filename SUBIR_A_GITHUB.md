@@ -12,6 +12,8 @@ También se incluye google-apps-script.gs. Subirlo a GitHub no actualiza el serv
 
 ## Validación
 
-Se ejecutaron 17 suites, con 314 comprobaciones aprobadas. La revisión visual en celular y la sincronización contra Google Sheets real siguen pendientes. No se publicó el sitio desde esta tarea.
+Se ejecutaron 18 suites, con 346 comprobaciones aprobadas. La revisión visual en celular y la sincronización contra Google Sheets real siguen pendientes. No se publicó el sitio desde esta tarea.
 
-INFORME_ATAQUE_RIVAL.md contiene el detalle de la Etapa 2. No se incluyeron respaldos, datos de partidos ni carpetas de desarrollo.
+INFORME_ATAQUES_BLOQUEOS.md contiene el detalle de la actualización actual; INFORME_ATAQUE_RIVAL.md corresponde a la entrega anterior. Los archivos .cjs son pruebas reproducibles de esta versión. No se incluyeron respaldos, datos de partidos ni carpetas de desarrollo.
+
+La PWA y los service workers no se modificaron. La distribución a instalaciones que ya tienen la versión anterior en caché requiere validación al publicar; no borres los datos del navegador para forzarla.

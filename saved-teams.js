@@ -15,7 +15,7 @@ function storeTeamTemplate(name, players, lineup, preferredId) {
   const templates = savedTeams();
   const existing = templates.find(t=>t.id === preferredId);
   const team = {id:existing?.id || uid(),name:name.trim(),updatedAt:new Date().toISOString(),
-    players:players.map(p=>({id:p.id,number:p.number.trim(),name:p.name.trim(),isLibero:!!p.isLibero,attackPosition:playerPosition(p)})),lineup:[...lineup]};
+    players:players.map(p=>({id:p.id,number:p.number.trim(),name:p.name.trim(),isLibero:!!p.isLibero||playerPosition(p)==='libero',attackPosition:playerPosition(p)})),lineup:[...lineup]};
   if (!validSavedTeam(team)) { toast('Completá el nombre del equipo y de los jugadores, con números distintos, al menos seis regulares y hasta dos líberos.'); return null; }
   const regular = team.players.filter(p=>!p.isLibero);
   const chosen = new Set();
@@ -78,3 +78,11 @@ document.addEventListener('change',event=>{
   if (t.matches('[data-saved-team]') && t.value) loadSavedTeam(t.value);
   if (t.matches('[data-remember-team]')) setupDraft.rememberTeam=t.checked;
 });
+
+function rememberPlayerPosition(match,player){
+  const team=savedTeams().find(t=>t.id===match.savedTeamId);if(!team)return;
+  const saved=team.players.find(p=>p.number===player.number);if(!saved)return;
+  const updated=team.players.map(p=>p===saved?{...p,attackPosition:playerPosition(player),isLibero:!!player.isLibero}:p);
+  if(!validSavedTeam({...team,players:updated}))return;
+  Object.assign(saved,{attackPosition:playerPosition(player),isLibero:!!player.isLibero});team.updatedAt=new Date().toISOString();
+}

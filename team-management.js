@@ -89,7 +89,7 @@ function teamOptions(players, selected) {
   return players.map(p => `<option value="${esc(p.id)}" ${p.id === selected ? 'selected' : ''}>#${esc(p.number)} ${esc(p.name)}${p.isLibero ? ' · L' : ''}</option>`).join('');
 }
 function prepareDraftLineup() {
-  for (const p of setupDraft.players) if (!p.id) p.id = uid();
+  for (const p of setupDraft.players) {if (!p.id) p.id = uid();if(playerPosition(p)==='libero')p.isLibero=true;}
   const regular = setupDraft.players.filter(p => !p.isLibero);
   const allowed = new Set(regular.map(p => p.id));
   const used = new Set();
@@ -102,7 +102,7 @@ function prepareDraftLineup() {
 function draftFormation() {
   prepareDraftLineup();
   return `<div class="subtle" style="margin-top:16px"><h3>Formación inicial · Set 1</h3><p class="hinttext">Elegí los seis titulares en sus posiciones de rotación. El líbero se registra aparte e ingresa por un zaguero.</p>
-  <div class="lineup-grid" style="margin-top:12px">${[4,3,2,5,6,1].map(pos => `<div class="field"><label for="draft-pos-${pos}">Posición ${pos}${pos === 1 ? ' · saque' : ''}</label><select id="draft-pos-${pos}" data-draft-position="${pos-1}"><option value="">Sin jugador</option>${teamOptions(setupDraft.players.filter(p => !p.isLibero), setupDraft.lineup[pos-1])}</select></div>`).join('')}</div>
+  <div class="lineup-grid" style="margin-top:12px">${[4,3,2,5,6,1].map(pos => `<div class="field"><label for="draft-pos-${pos}">Posición ${pos}${pos === 1 ? ' · saque' : ''}</label><select id="draft-pos-${pos}" data-draft-position="${pos-1}"><option value="">Sin jugador</option>${teamOptions(setupDraft.players.filter(p => !p.isLibero), setupDraft.lineup[pos-1])}</select>${renderPlayerJersey(setupDraft,setupDraft.players.find(p=>p.id===setupDraft.lineup[pos-1]))}</div>`).join('')}</div>
   <h3 style="margin-top:16px">Líberos</h3><p class="hinttext">Podés designar hasta dos. Necesitás además seis jugadores regulares.</p>
   ${setupDraft.players.map(p => `<label class="row" style="margin-top:8px"><input type="checkbox" style="width:18px;min-height:18px" data-draft-libero="${esc(p.id)}" ${p.isLibero ? 'checked' : ''}>#${esc(p.number)} ${esc(p.name)} · líbero</label>`).join('')}</div>`;
 }
@@ -137,7 +137,7 @@ function formationCard(m) {
   const s = teamSet(activeSet()), editable = !s.finished && !s.rallies.length && !s.changes.length && !s.libero;
   return `<div class="card"><h2>Formación inicial · Set ${s.number}</h2>
   <p>${editable ? 'Elegí un jugador por posición. Los cambios se guardan al seleccionar.' : 'La formación inicial queda conservada. Para cambiar jugadores usá Sustituciones.'}${s.initialLineupInferred ? ' En este set anterior se recuperó la primera formación registrada.' : ''}</p>
-  <div class="lineup-grid">${[4,3,2,5,6,1].map(pos => `<div class="field"><label for="initial-${pos}">Posición ${pos}${pos === 1 ? ' · saque' : ''}</label>${editable ? `<select id="initial-${pos}" data-initial-position="${pos-1}">${teamOptions(m.players.filter(p => !p.isLibero), s.positions[pos-1])}</select>` : `<strong>${esc(pname(m,s.initialLineup[pos-1]))}</strong>`}</div>`).join('')}</div></div>`;
+  <div class="lineup-grid">${[4,3,2,5,6,1].map(pos => `<div class="field"><label for="initial-${pos}">Posición ${pos}${pos === 1 ? ' · saque' : ''}</label>${renderPlayerJersey(m,playerById(m,(editable?s.positions:s.initialLineup)[pos-1]))}${editable ? `<select id="initial-${pos}" data-initial-position="${pos-1}">${teamOptions(m.players.filter(p => !p.isLibero), s.positions[pos-1])}</select>` : `<strong>${esc(pname(m,s.initialLineup[pos-1]))}</strong>`}</div>`).join('')}</div></div>`;
 }
 function changesCard(m) {
   const s = teamSet(activeSet()), current = courtPlayers(s);
@@ -146,7 +146,7 @@ function changesCard(m) {
   const disabled = s.finished || pending.length ? 'disabled' : '';
   const labels = {substitution:'Sustitución', 'libero-in':'Entra líbero', 'libero-out':'Sale líbero', 'libero-switch':'Cambio de líbero', 'libero-auto-out':'Sale líbero · automático','rotation-correction':'Corrección de rotación','serve-correction':'Corrección de servicio'};
   return `<div class="card"><div class="section-head"><h2>Cancha y cambios · Set ${s.number}</h2><span class="pill">${s.changes.filter(c => c.type === 'substitution').length} sustituciones</span></div>
-  <div class="mini-court">${[4,3,2,5,6,1].map(pos => `<div class="mini-zone"><span class="tiny">Posición ${pos}</span><strong style="display:block">${esc(pname(m,current[pos-1]))}${playerById(m,current[pos-1])?.isLibero ? ' · L' : ''}</strong></div>`).join('')}</div>
+  <div class="mini-court">${[4,3,2,5,6,1].map(pos => `<div class="mini-zone"><span class="tiny">Posición ${pos}</span>${renderPlayerJersey(m,playerById(m,current[pos-1]))}<strong style="display:block">${esc(pname(m,current[pos-1]))}${playerById(m,current[pos-1])?.isLibero ? ' · L' : ''}</strong></div>`).join('')}</div>
   <h3 style="margin-top:18px">Sustitución</h3><div class="grid-2"><div class="field"><label for="sub-out">Sale</label><select id="sub-out" ${disabled}>${teamOptions(m.players.filter(p => s.positions.includes(p.id) && p.id !== s.libero?.replacedId))}</select></div><div class="field"><label for="sub-in">Entra desde el banco</label><select id="sub-in" ${disabled}>${teamOptions(bench)}</select></div></div>
   <button class="btn btn-primary" style="margin-top:10px" data-action="team-substitute" ${disabled || (!bench.length ? 'disabled' : '')}>Registrar sustitución</button>
   ${!bench.length ? '<p class="hinttext">No hay jugadores regulares disponibles en el banco.</p>' : ''}
@@ -159,6 +159,18 @@ function changesCard(m) {
 }
 function liberoRoles(m) {
   return `<div class="card"><h2>Líberos del equipo</h2><p>Designá hasta dos. Un jugador de la formación o con participación registrada debe conservar su rol.</p>${m.players.map(p => `<label class="row" style="margin-top:8px"><input type="checkbox" style="width:18px;min-height:18px" data-player-libero="${esc(p.id)}" ${p.isLibero ? 'checked' : ''}>#${esc(p.number)} ${esc(p.name)} · líbero</label>`).join('')}</div>`;
+}
+function setLiberoDesignation(player,enabled,players,match=null) {
+  if (!player) return false;
+  if (!!player.isLibero !== enabled) {
+    const used=match?.sets.some(set=>set.positions.includes(player.id)||set.initialLineup?.includes(player.id)||set.libero?.playerId===player.id||set.rallies.some(r=>r.actions.some(a=>a.playerId===player.id))||set.changes?.some(c=>c.incoming===player.id||c.outgoing===player.id));
+    if (used) {toast('Este jugador ya tiene una posición o participación registrada. Conservá su rol de líbero o regular.');return false;}
+    if (enabled && players.filter(p=>p.isLibero&&p.id!==player.id).length>=2) {toast('Podés designar hasta dos líberos.');return false;}
+  }
+  player.isLibero=enabled;
+  if (enabled) player.attackPosition='libero';
+  else if (player.attackPosition==='libero') player.attackPosition='';
+  return true;
 }
 function handleTeamAction(action) {
   if (!action?.startsWith('team-')) return false;
@@ -199,8 +211,7 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (t.matches('[data-draft-libero]')) {
     const p = setupDraft.players.find(p => p.id === t.dataset.draftLibero);
-    if (p) p.isLibero = t.checked;
-    if (setupDraft.players.filter(p => p.isLibero).length > 2) { p.isLibero = false; toast('Podés designar hasta dos líberos.'); }
+    setLiberoDesignation(p,t.checked,setupDraft.players);
     render();
   }
   if (t.matches('[data-draft-position]')) {
@@ -222,9 +233,8 @@ document.addEventListener('change', e => {
   if (t.matches('[data-player-libero]') && m && s) {
     const p = playerById(m,t.dataset.playerLibero);
     if (!p) return;
-    const used = m.sets.some(set => set.positions.includes(p.id) || set.initialLineup?.includes(p.id) || set.libero?.playerId === p.id || set.rallies.some(r => r.actions.some(a => a.playerId === p.id)) || set.changes?.some(c => c.incoming === p.id || c.outgoing === p.id));
-    if (used || (t.checked && m.players.filter(x => x.isLibero).length >= 2)) { toast(used ? 'Este jugador ya tiene una posición o participación registrada. Conservá su rol.' : 'Podés designar hasta dos líberos.'); render(); return; }
-    p.isLibero = t.checked; save(); render();
+    if (!setLiberoDesignation(p,t.checked,m.players,m)) {render();return;}
+    rememberPlayerPosition(m,p);save();render();
   }
 });
 document.addEventListener('input', e => {

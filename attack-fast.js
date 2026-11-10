@@ -4,6 +4,7 @@ let attackDirection=null,attackDirectionSkipped=false,attackType='conventional';
 const attackPositions={outside:'Punta / Receptor',opposite:'Opuesto',middle:'Central',setter:'Armador',libero:'Líbero'};
 function playerPosition(p){
   if(p?.isLibero)return 'libero';
+  if(p?.attackPosition==='')return null;
   const aliases={outside:'outside',punta:'outside',receptor:'outside','punta / receptor':'outside','punta/receptor':'outside',opposite:'opposite',opuesto:'opposite',middle:'middle',central:'middle',setter:'setter',armador:'setter',colocador:'setter',libero:'libero'};
   for(const field of ['attackPosition','position','role','puesto','posicion']){const raw=p?.[field];if(typeof raw==='string'){const value=raw.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(aliases[value])return aliases[value];}}
   return null;
@@ -40,10 +41,26 @@ if(['attack-blocker','attack-blocker-clear','attack-blocker-player'].includes(ac
   }
 }
 save();render();return true;}
-document.addEventListener('change',event=>{const t=event.target;if(t.matches('[data-attack-position]')){const p=attackContext().player;if(p){p.attackPosition=attackPositions[t.value]?t.value:null;attackOriginManual=false;originZone=defaultAttackOrigin();resetRivalBlockerSelection(useBlockerDraft);save();render();}}});
+document.addEventListener('change',event=>{const t=event.target;if(t.matches('[data-attack-position]')){const p=attackContext().player;if(p){if(!assignPlayerPosition(p,t.value,activeMatch())){render();return;}attackOriginManual=false;originZone=defaultAttackOrigin();resetRivalBlockerSelection(useBlockerDraft);save();render();}}});
 
 function renderDraftPositions(){return '<details class="v2-extra"><summary>Puestos habituales del plantel</summary>'+setupDraft.players.map((p,i)=>`<div><strong>#${esc(p.number)} ${esc(p.name)}</strong>${rosterPositionField(p,`data-roster-position="${i}"`)}</div>`).join('')+'</details>';}
 function renderMatchPositions(m){return '<div class="card"><h2>Puestos habituales</h2>'+m.players.map(p=>`<div><strong>#${esc(p.number)} ${esc(p.name)}</strong>${rosterPositionField(p,`data-match-position="${esc(p.id)}"`)}</div>`).join('')+'</div>';}
-document.addEventListener('change',event=>{const t=event.target;let p;if(t.matches('[data-roster-position]'))p=setupDraft.players[+t.dataset.rosterPosition];if(t.matches('[data-match-position]'))p=playerById(activeMatch(),t.dataset.matchPosition);if(p){p.attackPosition=attackPositions[t.value]?t.value:null;if(t.matches('[data-match-position]')){attackOriginManual=false;originZone=selectedSkill==='attack'?defaultAttackOrigin():originZone;save();}render();}});
+document.addEventListener('change',event=>{const t=event.target;let p;if(t.matches('[data-roster-position]'))p=setupDraft.players[+t.dataset.rosterPosition];if(t.matches('[data-match-position]'))p=playerById(activeMatch(),t.dataset.matchPosition);if(p){if(!assignPlayerPosition(p,t.value,t.matches('[data-match-position]')?activeMatch():null)){render();return;}if(t.matches('[data-match-position]')){attackOriginManual=false;originZone=selectedSkill==='attack'?defaultAttackOrigin():originZone;save();}render();}});
 
 function resetRivalBlockerSelection(target){setRivalBlockers(target,[]);delete target.metadata.rivalBlockerRoles;delete target.metadata.rivalBlockerUnidentified;}
+
+function assignPlayerPosition(player,value,match=null){
+  if(value!==''&&!Object.prototype.hasOwnProperty.call(attackPositions,value))return false;
+  const players=match?.players||setupDraft.players;
+  if(!setLiberoDesignation(player,value==='libero',players,match))return false;
+  player.attackPosition=value;
+  if(match)rememberPlayerPosition(match,player);
+  return true;
+}
+function jerseyStyle(match){return match?.jerseyStyle==='white'?'white':'blue';}
+function playerJerseyStyle(match,player){const style=jerseyStyle(match);return player?.isLibero?(style==='blue'?'white':'blue'):style;}
+function renderPlayerJersey(match,player){
+  const style=playerJerseyStyle(match,player),number=String(player?.number||'?'),label=style==='blue'?'azul con rayas blancas':'blanca con rayas azules';
+  return `<span class="jersey kit-shirt kit-${style}" role="img" aria-label="Camiseta ${label}, número ${esc(number)}${player?.isLibero?', líbero':''}"><span class="kit-number ${number.length>2?'kit-number-long':''}" aria-hidden="true">${esc(number)}</span></span>`;
+}
+function renderJerseyChoices(){const chosen=jerseyStyle(setupDraft);return `<fieldset class="kit-selector"><legend>Camiseta del equipo</legend><div class="kit-options">${[['blue','Azul con rayas blancas'],['white','Blanca con rayas azules']].map(([style,label])=>`<button type="button" class="btn kit-choice ${chosen===style?'kit-choice-selected':''}" data-action="team-kit" data-style="${style}" aria-pressed="${chosen===style}">${renderPlayerJersey({jerseyStyle:style},{number:'7'})}<strong>${label}</strong><span class="kit-libero-preview">Líbero ${renderPlayerJersey({jerseyStyle:style},{number:'5',isLibero:true})}</span></button>`).join('')}</div><small>El líbero lleva automáticamente la combinación contraria.</small></fieldset>`;}

@@ -19,7 +19,7 @@
 .v2-player-card .player {flex-direction:column;align-items:center;justify-content:center;text-align:center;min-height:94px;border-width:2px;color:var(--ink)}
 .v2-player-card .player.is-libero .jersey {background:#f8e4ad;color:#6d510b}
 .v2-player-card .player.selected {box-shadow:0 0 0 1px var(--primary)}
-.v2-player-card .jersey {clip-path:polygon(23% 0,38% 0,43% 9%,57% 9%,62% 0,77% 0,100% 21%,82% 39%,77% 32%,77% 100%,23% 100%,23% 32%,18% 39%,0 21%);border-radius:0;width:44px;height:43px;flex:0 0 43px;font-size:19px;padding-top:3px}
+.v2-player-card .jersey {clip-path:polygon(23% 0,38% 0,43% 9%,57% 9%,62% 0,77% 0,100% 21%,82% 39%,82% 32%,82% 100%,18% 100%,18% 32%,18% 39%,0 21%);border-radius:0;width:44px;height:43px;flex:0 0 43px;font-size:19px;padding-top:3px}
 .v2-player-copy {min-width:0;width:100%}
 .v2-player-card .playername {font-size:12px;white-space:nowrap;display:block;overflow:hidden;text-overflow:ellipsis}
 .v2-player-card .playerpos {font-size:10px}
@@ -107,5 +107,35 @@
 .rival-access{display:flex;gap:8px;margin:12px 0;flex-wrap:wrap}.rival-access>.btn{flex:1;min-height:48px}.rival-players .btn{display:flex;flex-direction:column;align-items:center}.rival-players strong{font-size:24px}.rival-players small{color:inherit}.rival-results{display:grid;grid-template-columns:1fr 1fr}.rival-trend{margin:10px 0;padding:12px}.has-rival-panel>.v2-live-head{position:sticky;top:0;z-index:20;background:var(--bg);padding:8px}.rival-entry input[type=checkbox]{width:20px;min-height:20px}.rival-entry fieldset{margin-top:12px}
 
 .rival-trend-compact p{margin:4px 0}.rival-trend-compact p br{display:none}.rival-trend-compact p strong{margin-right:8px}.rival-trend-compact small{display:none}
+
+/* Camisetas por partido: el contraste del líbero se calcula desde su identidad. */
+.jersey.kit-shirt {
+  display:inline-flex;align-items:center;justify-content:center;vertical-align:middle;
+  width:46px;height:48px;min-width:46px;flex:0 0 46px;padding:9px 0 0;
+  clip-path:polygon(23% 0,38% 0,43% 9%,57% 9%,62% 0,77% 0,100% 21%,82% 39%,77% 32%,77% 100%,23% 100%,23% 32%,18% 39%,0 21%);
+  border-radius:0;box-shadow:inset 0 0 0 1px #174783;
+}
+.jersey.kit-shirt.kit-blue {--kit-background:repeating-linear-gradient(90deg,#174c9b 0 9px,#fff 9px 12px);--kit-number-bg:#123d7b;--kit-number-ink:#fff}
+.jersey.kit-shirt.kit-white {--kit-background:repeating-linear-gradient(90deg,#fff 0 9px,#2460b9 9px 12px);--kit-number-bg:#fff;--kit-number-ink:#123d7b}
+.jersey.kit-shirt,.v2-player-card .player.is-libero .jersey.kit-shirt,.player.selected .jersey.kit-shirt {background:var(--kit-background);color:var(--kit-number-ink)}
+.kit-number {display:flex;align-items:center;justify-content:center;min-width:25px;max-width:32px;min-height:26px;padding:1px 2px;border-radius:3px;background:var(--kit-number-bg);color:var(--kit-number-ink);font-size:19px;font-weight:900;line-height:1;font-variant-numeric:tabular-nums}
+.kit-number.kit-number-long {font-size:13px;min-width:24px;padding:1px}
+.kit-selector {border:1px solid var(--border);border-radius:12px;padding:12px;margin:0;min-width:0}
+.kit-selector legend {font-weight:750;padding:0 5px}
+.kit-options {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:8px}
+.kit-choice {display:flex;flex-direction:column;gap:10px;text-align:center;min-width:0;min-height:170px;padding:12px 8px;font-size:13px}
+.kit-choice-selected {outline:2px solid var(--primary);outline-offset:1px;background:var(--primary-soft)}
+.kit-choice>.jersey.kit-shirt {width:62px;height:64px;min-width:62px;flex-basis:64px}
+.kit-libero-preview {display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;font-weight:500}
+.kit-libero-preview .jersey.kit-shirt {width:30px;height:32px;min-width:30px;flex-basis:30px;padding-top:6px}
+.kit-libero-preview .kit-number {font-size:13px;min-width:18px;min-height:18px;padding:0}
+.roster-row>.roster-position {grid-column:1/-1;margin:0 0 7px}
+.lineup-grid .jersey.kit-shirt,.mini-court .jersey.kit-shirt {margin:5px auto}
+@media(max-width:430px) {
+  .v2-player-card .jersey.kit-shirt {width:42px;height:45px;min-width:42px;flex-basis:42px}
+  .v2-player-card .kit-number {font-size:18px}
+  .v2-player-card .kit-number-long {font-size:13px}
+  .kit-choice {font-size:12px;padding:10px 6px}
+}
 
 .block-suggested{border:2px dashed var(--primary);background:var(--primary-soft)}.inline-block-confirm{padding:12px;margin:10px 0;border:2px solid var(--primary);border-radius:12px}.attack-position-label{display:block;margin:6px 0}.roster-position{display:block;margin:8px 0}.inline-block-confirm input[type=checkbox]{width:20px;min-height:20px}.attack-fast[aria-label="Origen"]>.btn,.attack-fast[aria-label="Origen rival habitual"]>.btn{min-height:56px}

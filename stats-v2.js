@@ -73,7 +73,9 @@
   }
   function entries(match,filter='all') {
     match=forSide(match);
-    return rallies(match,filter).flatMap(rally=>(rally.actions || []).map((action,index)=>({action,rally,index,result:resolveOutcome(action,rally)})));
+    const selected=typeof filter==='object'?filter.set??'all':filter;
+    const open=filter?.includeOpen?(match.sets||[]).filter(s=>selected==='all'||String(selected)===String(s.number)).flatMap(s=>(s.rallies||[]).filter(r=>r.status==='open').map(r=>({...r,setNo:s.number}))):[];
+    return [...rallies(match,filter),...open].flatMap(rally=>(rally.actions || []).map((action,index)=>({action,rally,index,result:resolveOutcome(action,rally)})));
   }
   const percent = (n,d) => d ? 100*n/d : null;
   const zones = () => ({1:0,2:0,3:0,4:0,5:0,6:0,unknown:0});
@@ -88,7 +90,64 @@
     const a = entry.action;
     return a.skill === 'attack' && !a.metadata?.freeBall && !a.isFreeBall && !['free_ball','freeball'].includes(a.metadata?.attackType);
   }
+  const statusOf=(a,kind)=>typeof VolleyRally!=='undefined'?VolleyRally.zoneStatus(a,kind):a.metadata?.[kind+'Status']||([1,2,3,4,5,6].includes(a[kind+'Zone'])?'recorded':'unknown');
+  const qualityOf=e=>({perfect:3,positive:2,poor:1,direct_error:0})[e.result.outcomeId]??null;
+  const spatialStatus=s=>['confirmed','inferred','recorded'].includes(s);
+  function trendBucket(){return {count:0,kills:0,errors:0,continues:0,aces:0,positive:0,neutral:0,q0:0,q1:0,q2:0,q3:0,observed:0,inferred:0,recorded:0,outcomes:{},players:{},percent:null};}
+  function addZone(bucket,e,status,quality=null){
+    bucket.count++;bucket.observed+=+(status==='confirmed');bucket.inferred+=+(status==='inferred');bucket.recorded+=+(status==='recorded');
+    const id=e.result.outcomeId;bucket.outcomes[id]=(bucket.outcomes[id]||0)+1;
+    if(e.action.playerId)bucket.players[e.action.playerId]=(bucket.players[e.action.playerId]||0)+1;
+    if(e.action.skill==='serve'){bucket.aces+=+(id==='ace');bucket.errors+=+(id==='error');bucket.positive+=+(id==='positive');bucket.neutral+=+(id==='neutral');}
+    if(quality!==null)bucket['q'+quality]++;
+  }
+  function relationshipSummary(rows){
+    const groups=new Map();for(const row of rows){
+      if(!row.serverId||!row.receiverId)continue;
+      const key=row.serverId+':'+row.receiverId;if(!groups.has(key))groups.set(key,{serverId:row.serverId,receiverId:row.receiverId,count:0,positive:0,perfect:0,errors:0,serveRecorded:0,q0:0,q1:0,q2:0,q3:0,zones:{},byZone:{},inferred:0,confirmed:0});
+      const g=groups.get(key);g.count++;if(row.quality!==null&&row.quality!==undefined){g['q'+row.quality]++;g.positive+=+(row.quality>=2);g.perfect+=+(row.quality===3);g.errors+=+(row.quality===0);}
+      g.serveRecorded+=+!!row.serveRecorded;g.inferred+=+(row.status==='inferred');g.confirmed+=+(row.status==='confirmed');
+      if(spatialStatus(row.status)&&row.zone){g.zones[row.zone]=(g.zones[row.zone]||0)+1;const b=g.byZone[row.zone] ||= {count:0,q0:0,q1:0,q2:0,q3:0};b.count++;if(row.quality!==null&&row.quality!==undefined)b['q'+row.quality]++;}
+    }
+    return [...groups.values()];
+  }
+  function receptionRelations(list){return relationshipSummary(list.filter(e=>e.action.skill==='reception').map(e=>({serverId:e.action.metadata?.serverContext?.playerId,receiverId:e.action.playerId,quality:qualityOf(e),zone:zoneOf(e.action,'origin'),status:statusOf(e.action,'origin'),serveRecorded:!!e.action.metadata?.serveActionId})));}
+  function trendSummary(list,config){
+    const zoneBuckets=()=>Object.fromEntries([1,2,3,4,5,6].map(z=>[z,trendBucket()]));
+    const attack={total:0,known:0,missing:0,directions:Object.fromEntries(['diagonal','paralela','olla','zona1','zona5'].map(d=>[d,trendBucket()])),origins:zones(),types:{},predominant:[]};
+    const serve={total:0,known:0,unknown:0,knownDirection:0,directions:{paralela:trendBucket(),diagonal:trendBucket()},origins:zones(),destinations:zoneBuckets(),pairs:[],predominant:[],preferredZones:[]};
+    const recovery=()=>({total:0,known:0,unknown:0,references:0,zones:zoneBuckets(),quality:{q0:0,q1:0,q2:0,q3:0},vsServers:[]});
+    const reception=recovery(),defense=recovery(),coverage=recovery(),serveRelations=[];
+    for(const e of list){const a=e.action,id=e.result.outcomeId,md=a.metadata||{};
+      if(attackAttempt(e)){
+        attack.total++;attack.origins[zoneOf(a,'origin')||'unknown']++;
+        const type=md.attackType||'unknown';if(!attack.types[type])attack.types[type]=trendBucket();const t=attack.types[type];t.count++;t.outcomes[id]=(t.outcomes[id]||0)+1;
+        const b=attack.directions[md.attackDirection];if(b){attack.known++;b.count++;b.kills+=+['kill','tip_kill','use_block_out'].includes(id);b.errors+=+(id==='error'||id==='blocked_point'&&config.blockedPointIsError);b.continues+=+['continue','tip_continue','covered_block'].includes(id);b.outcomes[id]=(b.outcomes[id]||0)+1;}
+      }
+      if(a.skill==='serve'){
+        serve.total++;serve.origins[zoneOf(a,'origin')||'unknown']++;
+        const zone=zoneOf(a,'destination'),status=statusOf(a,'destination'),q=md.reception?.quality??null;
+        if(serve.destinations[zone]&&spatialStatus(status)){serve.known++;addZone(serve.destinations[zone],e,status,q);}
+        const d=serve.directions[md.serveDirection];if(d){serve.knownDirection++;d.count++;d.outcomes[id]=(d.outcomes[id]||0)+1;}
+        if(md.reception)serveRelations.push({serverId:a.playerId,receiverId:md.reception.playerId,quality:q,zone,status,serveRecorded:true});
+      }
+      if(['reception','defense'].includes(a.skill)){
+        const target=a.skill==='reception'?reception:md.defenseKind==='coverage'?coverage:defense,zone=zoneOf(a,'origin'),status=statusOf(a,'origin');
+        const q=a.skill==='reception'?qualityOf(e):({perfect:3,positive:2,limited:1,direct_error:0})[id]??null;
+        target.total++;if(q!==null)target.quality['q'+q]++;
+        target.references+=+(status==='reference');if(target.zones[zone]&&spatialStatus(status)){target.known++;addZone(target.zones[zone],e,status,q);}
+      }
+    }
+    function finalize(groups,total){for(const g of Object.values(groups)){g.percent=percent(g.count,total);g.efficiency=percent(g.kills-g.errors,g.count);}}
+    function dominant(groups){const max=Math.max(0,...Object.values(groups).map(g=>g.count));return max?Object.keys(groups).filter(k=>groups[k].count===max):[];}
+    attack.missing=attack.total-attack.known;finalize(attack.directions,attack.known);attack.predominant=dominant(attack.directions);
+    serve.unknown=serve.total-serve.known;finalize(serve.directions,serve.knownDirection);finalize(serve.destinations,serve.known);serve.predominant=dominant(serve.directions);serve.preferredZones=dominant(serve.destinations);serve.pairs=relationshipSummary(serveRelations);
+    for(const t of [reception,defense,coverage]){t.unknown=t.total-t.known;finalize(t.zones,t.known);}
+    reception.vsServers=receptionRelations(list);
+    return {attack,serve,reception,defense,coverage};
+  }
   function summarize(list,config) {
+    const trends=trendSummary(list,config);
     const coverages=list.filter(e=>e.action.skill==='defense'&&e.action.metadata?.defenseKind==='coverage');
     list=list.filter(e=>!coverages.includes(e));
     const count = (skill,id) => list.filter(e=>e.action.skill === skill && e.result.outcomeId === id).length;
@@ -123,6 +182,7 @@
     }
     for(const bucket of Object.values(byRole))bucket.efficiency=percent(bucket.kills-bucket.errors,bucket.attempts);
     return {
+      trends,
       coverage:{total:coverages.length,perfect:coverages.filter(e=>e.result.outcomeId==='perfect').length,positive:coverages.filter(e=>e.result.outcomeId==='positive').length,limited:coverages.filter(e=>e.result.outcomeId==='limited').length,directErrors:coverages.filter(e=>e.result.outcomeId==='direct_error').length},
       attack:{total:attackEntries.length,attempts:attackEntries.length,kills:K,conventionalKills,unspecifiedKills,useBlockOutKills,tipKills,tipContinues:ac('tip_continue'),errors:E,continues:ac('continue')+ac('tip_continue'),coveredBlocks:ac('covered_block'),blockedPoints:blocked,ambiguousBlocks:ac('ambiguous_block'),efficiency:percent(K-E,attackEntries.length),killPct:percent(K,attackEntries.length),origin,destination,phase,byRole},
       serve:{total:total('serve'),aces:count('serve','ace'),positive:count('serve','positive'),neutral:count('serve','neutral'),errors:count('serve','error'),acePct:percent(count('serve','ace'),total('serve')),errorPct:percent(count('serve','error'),total('serve'))},
@@ -182,7 +242,7 @@
     return (match.players || []).map(p=>{
       const playerEntries=list.filter(e=>participants(e.action).includes(p.id)),s=summarize(playerEntries,config),a=s.attack;
       const assistsCount=assists.filter(x=>x.setterId === p.id).length;s.setting.assists=assistsCount;
-      return {p,total:playerEntries.length,attack:a.total,K:a.kills,conventionalKills:a.conventionalKills,unspecifiedKills:a.unspecifiedKills,useBlockOutKills:a.useBlockOutKills,tipKills:a.tipKills,tipContinues:a.tipContinues,E:a.errors,eff:a.efficiency,killPct:a.killPct,attackContinue:a.continues,coveredBlocks:a.coveredBlocks,blockedPoints:a.blockedPoints,ambiguousBlocks:a.ambiguousBlocks,
+      return {p,trends:s.trends,total:playerEntries.length,attack:a.total,K:a.kills,conventionalKills:a.conventionalKills,unspecifiedKills:a.unspecifiedKills,useBlockOutKills:a.useBlockOutKills,tipKills:a.tipKills,tipContinues:a.tipContinues,E:a.errors,eff:a.efficiency,killPct:a.killPct,attackContinue:a.continues,coveredBlocks:a.coveredBlocks,blockedPoints:a.blockedPoints,ambiguousBlocks:a.ambiguousBlocks,
         serve:s.serve.total,aces:s.serve.aces,servePos:s.serve.positive,serveNeutral:s.serve.neutral,serveErr:s.serve.errors,rec:s.reception.total,recPos:s.reception.q2+s.reception.q3,recPerf:s.reception.q3,recPoor:s.reception.q1,recErr:s.reception.q0,
         blk:s.block.points,blkSolo:s.block.soloPoints,blkAssisted:s.block.assistedPoints,blkUnknown:s.block.unknownPoints,blkTouches:s.block.positiveTouches,blkFaults:s.block.faults,
         def:s.defense.total,defPos:s.defense.perfect+s.defense.positive,defPerfect:s.defense.perfect,defLimited:s.defense.limited,defErrors:s.defense.directErrors,setting:s.setting.total,assists:assistsCount,fundamentals:s};
@@ -208,6 +268,6 @@
     <details><summary>Ataque por jugador y variante</summary><div class="tablewrap"><table><thead><tr><th>Jugador</th><th>Convencional</th><th>Use / block-out</th><th>Toque / colocada punto</th><th>Sin variante registrada</th><th>Kills totales</th><th>Eficacia general</th></tr></thead><tbody>${players.map(x=>`<tr><td>${escape('#'+x.p.number+' '+x.p.name)}</td><td>${x.conventionalKills}</td><td>${x.useBlockOutKills}</td><td>${x.tipKills}</td><td>${x.unspecifiedKills}</td><td>${x.K}</td><td>${rate(x.eff)}</td></tr>`).join('')}</tbody></table></div><p class="hinttext">Los puntos anteriores sin técnica identificada conservan sus kills e intentos en «Sin variante registrada».</p></details><details style="margin-top:12px"><summary>Asistencias y bloqueos por jugador</summary><div class="tablewrap"><table><thead><tr><th>Jugador</th><th>Asistencias</th><th>Bloqueos individuales</th><th>Participaciones en bloqueo asistido</th><th>Composición desconocida</th></tr></thead><tbody>${players.map(x=>`<tr><td>${escape('#'+x.p.number+' '+x.p.name)}</td><td>${x.assists}</td><td>${x.blkSolo}</td><td>${x.blkAssisted}</td><td>${x.blkUnknown}</td></tr>`).join('')}</tbody></table></div></details>
     <details style="margin-top:12px"><summary>Distribución ofensiva: origen y destino</summary><div class="tablewrap"><table><thead><tr><th>Zona</th><th>Origen propio</th><th>Destino rival</th></tr></thead><tbody>${zoneRows}</tbody></table></div><p class="hinttext">Fase registrada: recepción ${s.attack.phase.reception} · contraataque ${s.attack.phase.counterattack} · sin identificar ${s.attack.phase.unknown}. No se inventan zonas ni fases ausentes.</p></details></div>`;
   }
-  root.StatsV2={forSide,summarizeEntries:(list,config={})=>summarize(list,{...defaults,...config}),resolveOutcome,participants,rallies,entries,getMatchData,getPlayerStats,renderStatisticsV2,zoneOf,dataQuality,configure:settings=>(configured={...configured,...settings}),defaults:{...defaults}};
+  root.StatsV2={forSide,statusOf,relationshipSummary,receptionRelations,trendSummary,summarizeEntries:(list,config={})=>summarize(list,{...defaults,...config}),resolveOutcome,participants,rallies,entries,getMatchData,getPlayerStats,renderStatisticsV2,zoneOf,dataQuality,configure:settings=>(configured={...configured,...settings}),defaults:{...defaults}};
   root.renderStatisticsV2=renderStatisticsV2;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

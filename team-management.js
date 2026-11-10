@@ -1,4 +1,27 @@
 'use strict';
+function renderCourtControls(m){
+  const s=activeSet();
+  if(!VolleyCourt.enabled(m,s))return `<section class="card"><h2>Líbero automático y posiciones tácticas</h2><p>Activá estas mejoras para las próximas jugadas. Las acciones anteriores se conservan.</p><button class="btn btn-primary" data-action="court-enable">Activar mejoras de cancha</button></section>`;
+  return `<section class="card"><h2>Líbero automático y posiciones tácticas</h2>${['us','them'].map(side=>{
+    const roster=VolleyRally.roster(m,side),raw=VolleyRally.positions(s,side,false),middles=roster.filter(p=>raw.includes(p.id)&&playerPosition(p)==='middle'),liberos=roster.filter(p=>p.isLibero),chosen=m.liberoPreferred?.[side]||liberos.find(p=>p.id===(side==='us'?s.libero:s.opponentLineup?.libero)?.playerId)?.id||liberos[0]?.id;
+    return `<fieldset><legend>${esc(side==='us'?m.team:m.opponent)}</legend><label class="row"><input type="checkbox" data-court-auto="${side}" ${m.liberoAuto?.[side]!==false?'checked':''}>Reemplazar automáticamente a los centrales zagueros</label><label>Líbero habitual<select data-court-libero="${side}"><option value="">${liberos.length?'Primero disponible':'Sin líbero designado'}</option>${teamOptions(liberos,chosen)}</select></label><p class="hinttext">Centrales en formación: ${middles.map(p=>'#'+esc(p.number)).join(' / ')||'Sin identificar'}. ${middles.length===2?'Asociados por su rol y posición oficial.':'Identificá los dos centrales para habilitar el ingreso automático.'} Cuando saca un central, el equipo juega sin líbero.</p><button class="btn" data-action="court-resume-libero" data-side="${side}">Retomar reemplazos automáticos</button></fieldset>`;
+  }).join('')}<p class="hinttext">Un reemplazo manual se respeta hasta el próximo cambio de servicio o formación. Estos reemplazos no consumen sustituciones. Las correcciones tácticas están en cada cancha del panel En vivo.</p></section>`;
+}
+document.addEventListener('change',e=>{
+  const t=e.target;if(t.matches('[data-court-setup]')){setupDraft.courtAutomation=t.checked;return;}const m=activeMatch(),s=activeSet();if(!m||!s)return;
+  if(t.matches('[data-court-auto]')||t.matches('[data-court-libero]')){
+    if(!betweenRallies(s)){render();return;}
+    const side=t.dataset.courtAuto||t.dataset.courtLibero;if(!['us','them'].includes(side))return;
+    if(t.matches('[data-court-auto]')){m.liberoAuto ||= {};m.liberoAuto[side]=t.checked;}
+    else {if(t.value&&!VolleyRally.roster(m,side).some(p=>p.id===t.value&&p.isLibero)){render();return;}m.liberoPreferred ||= {};m.liberoPreferred[side]=t.value;}
+    if(s.liberoManual)delete s.liberoManual[side];VolleyCourt.sync(m,s);beginRallyFlow();save();render();
+  }
+  if(t.matches('[data-court-move]')){
+    const side=t.dataset.side;if(!['us','them'].includes(side))return;
+    if(VolleyCourt.move(m,s,side,t.dataset.player,+t.value)){refreshTacticalInput();save();render();}
+  }
+  if(t.matches('[data-court-setup]'))setupDraft.courtAutomation=t.checked;
+});
 function enableRallyFlow(m,set,seed){
   m.rallyAutomation=2;m.rivalPlayers ||= [];
   const source=seed||set.opponentLineup?.current||Array.from({length:6},()=>({}));
@@ -28,7 +51,7 @@ function recordRivalChange(type,mutate){
   const before=structuredCloneSafe(s.opponentLineup);mutate(s,m);s.changes ||= [];
   const lib=s.opponentLineup.libero||before.libero,libChange=type.includes('libero');
   s.changes.push({id:uid(),type,side:'them',score:{...s.score},rotation:s.rotation,position:0,outgoing:libChange?(type==='rival-libero-in'?lib.replacedId:lib.playerId):before.current.find((p,i)=>p.id!==s.opponentLineup.current[i]?.id)?.id||before.current[0].id,incoming:libChange?(type==='rival-libero-in'?lib.playerId:lib.replacedId):s.opponentLineup.current.find((p,i)=>p.id!==before.current[i]?.id)?.id||before.current[0].id,rallyCount:s.rallies.length,beforeOpponent:before,opponentAfter:structuredCloneSafe(s.opponentLineup),timestamp:new Date().toISOString()});
-  reconcileRivalLibero(m,s);beginRallyFlow();save();render();return true;
+  if(type.includes('libero'))VolleyCourt.manualLibero(s,'them');reconcileRivalLibero(m,s);VolleyCourt.sync(m,s);beginRallyFlow();save();render();return true;
 }
 document.addEventListener('change',e=>{
   const t=e.target,m=activeMatch();
@@ -44,7 +67,7 @@ document.addEventListener('change',e=>{
     if(key==='position'&&!['',...Object.keys(attackPositions)].includes(value))return;
     if(key==='position'&&value==='libero'&&m.rivalPlayers.filter(q=>q.isLibero&&q!==p).length>=2){toast('Hasta dos líberos rivales.');render();return;}
     if(key==='position'&&(p.isLibero!== (value==='libero'))&&m.sets.some(s=>s.rallies.some(r=>r.actions.some(a=>a.playerId===p.id))||VolleyRally.positions(s,'them',false).includes(p.id))){toast('Para cambiar la designación de líbero, usá un jugador sin participación y fuera de la formación.');render();return;}
-    p[key]=value;if(key==='number')p.provisional=false;if(key==='position'){p.isLibero=value==='libero';delete p.attackPosition;}save();render();
+    p[key]=value;if(key==='number')p.provisional=false;if(key==='position'){p.isLibero=value==='libero';delete p.attackPosition;}if(!pending.length){VolleyCourt.sync(m,activeSet());if(VolleyCourt.enabled(m,activeSet()))beginRallyFlow();}save();render();
   }
   if(t.matches('[data-flow-lineup]')&&m){const pos=+t.dataset.flowLineup,id=t.value;
     recordRivalChange('rival-lineup',s=>{const rows=s.opponentLineup.current,index=rows.findIndex(p=>p.id===id);if(index>=0)[rows[pos],rows[index]]=[rows[index],rows[pos]];else {const p=m.rivalPlayers.find(p=>p.id===id&&!p.isLibero);if(p)rows[pos]={...p};}s.opponentLineup.libero=null;});
@@ -170,7 +193,7 @@ function teamChange(s, type, outgoing, incoming, position, before) {
   s.changes.push({id:uid(), timestamp:new Date().toISOString(), type, outgoing, incoming, position,
     score:{...s.score}, rallyCount:s.rallies.length, rotation:s.rotation, before});
 }
-function teamSnapshot(s) { return {positions:[...s.positions], libero:s.libero ? {...s.libero} : null,serve:s.serve,rotation:s.rotation}; }
+function teamSnapshot(s) { return {liberoManual:structuredCloneSafe(s.liberoManual||{}),tacticalOverrides:structuredCloneSafe(s.tacticalOverrides||{}),positions:[...s.positions], libero:s.libero ? {...s.libero} : null,serve:s.serve,rotation:s.rotation}; }
 function betweenRallies(s) {
   if (s.finished) { toast('El set ya está finalizado.'); return false; }
   if (pending.length) { toast('Cerrá el punto en curso o quitá sus acciones antes de hacer un cambio.'); return false; }
@@ -186,7 +209,7 @@ function reconcileLibero(s) {
   }
 }
 function formationCard(m) {
-  const s = teamSet(activeSet()), editable = !s.finished && !s.rallies.length && !s.changes.length && !s.libero;
+  const s = teamSet(activeSet()), editable = !s.finished && !s.rallies.length && !s.changes.some(c=>!c.automatic) && (!s.libero||VolleyCourt.enabled(m,s));
   return `<div class="card"><h2>Formación inicial · Set ${s.number}</h2>
   <p>${editable ? 'Elegí un jugador por posición. Los cambios se guardan al seleccionar.' : 'La formación inicial queda conservada. Para cambiar jugadores usá Sustituciones.'}${s.initialLineupInferred ? ' En este set anterior se recuperó la primera formación registrada.' : ''}</p>
   <div class="lineup-grid">${[4,3,2,5,6,1].map(pos => `<div class="field"><label for="initial-${pos}">Posición ${pos}${pos === 1 ? ' · saque' : ''}</label>${renderPlayerJersey(m,playerById(m,(editable?s.positions:s.initialLineup)[pos-1]))}${editable ? `<select id="initial-${pos}" data-initial-position="${pos-1}">${teamOptions(m.players.filter(p => !p.isLibero), s.positions[pos-1])}</select>` : `<strong>${esc(pname(m,s.initialLineup[pos-1]))}</strong>`}</div>`).join('')}</div></div>`;
@@ -196,7 +219,7 @@ function changesCard(m) {
   const bench = m.players.filter(p => !p.isLibero && !s.positions.includes(p.id));
   const liberos = m.players.filter(p => p.isLibero);
   const disabled = s.finished || pending.length ? 'disabled' : '';
-  const labels = {substitution:'Sustitución', 'libero-in':'Entra líbero', 'libero-out':'Sale líbero', 'libero-switch':'Cambio de líbero', 'libero-auto-out':'Sale líbero · automático','rotation-correction':'Corrección de rotación','serve-correction':'Corrección de servicio'};
+  const labels = {substitution:'Sustitución', 'libero-in':'Entra líbero', 'libero-out':'Sale líbero', 'libero-switch':'Cambio de líbero', 'libero-auto-out':'Sale líbero · automático','libero-auto-in':'Entra líbero · automático','libero-auto-switch':'Reemplazo del líbero · automático','rotation-correction':'Corrección de rotación','serve-correction':'Corrección de servicio'};
   return `<div class="card"><div class="section-head"><h2>Cancha y cambios · Set ${s.number}</h2><span class="pill">${s.changes.filter(c => c.type === 'substitution').length} sustituciones</span></div>
   <div class="mini-court">${[4,3,2,5,6,1].map(pos => `<div class="mini-zone"><span class="tiny">Posición ${pos}</span>${renderPlayerJersey(m,playerById(m,current[pos-1]))}<strong style="display:block">${esc(pname(m,current[pos-1]))}${playerById(m,current[pos-1])?.isLibero ? ' · L' : ''}</strong></div>`).join('')}</div>
   <h3 style="margin-top:18px">Sustitución</h3><div class="grid-2"><div class="field"><label for="sub-out">Sale</label><select id="sub-out" ${disabled}>${teamOptions(m.players.filter(p => s.positions.includes(p.id) && p.id !== s.libero?.replacedId))}</select></div><div class="field"><label for="sub-in">Entra desde el banco</label><select id="sub-in" ${disabled}>${teamOptions(bench)}</select></div></div>
@@ -206,7 +229,7 @@ function changesCard(m) {
   <p class="hinttext">El líbero ocupa el lugar de un zaguero sin cambiar el orden de rotación. Sale automáticamente cuando corresponde pasar a la delantera o sacar. Sus acciones se atribuyen a su nombre. Este registro no valida todos los límites reglamentarios de sustituciones.</p>
   ${pending.length ? '<p class="errorbox">Hay acciones pendientes: cerrá el punto para habilitar cambios.</p>' : ''}
   <details style="margin-top:14px"><summary>Historial de cambios (${s.changes.length})</summary><div class="history" style="margin-top:10px">${s.changes.length ? s.changes.slice().reverse().map(c => `<div class="history-row"><div><strong>${esc(labels[c.type] || c.type)}</strong><br><small>${c.description?esc(c.description):esc(pname(m,c.outgoing))+' → '+esc(pname(m,c.incoming))+' · P'+c.position}</small></div><span class="tag">${c.score.us}–${c.score.them} · R${c.rotation}</span></div>`).join('') : '<p>Sin cambios registrados en este set.</p>'}</div></details>
-  <button class="btn btn-small" style="margin-top:10px" data-action="team-undo-change" ${disabled || (!s.changes.length || s.changes.at(-1).rallyCount !== s.rallies.length || s.changes.at(-1).type === 'libero-auto-out' ? 'disabled' : '')}>Deshacer último cambio</button>
+  <button class="btn btn-small" style="margin-top:10px" data-action="team-undo-change" ${disabled || (!s.changes.length || s.changes.at(-1).rallyCount !== s.rallies.length || (s.changes.at(-1).automatic||s.changes.at(-1).side==='them'||s.changes.at(-1).type === 'libero-auto-out') ? 'disabled' : '')}>Deshacer último cambio</button>
   </div>`;
 }
 function liberoRoles(m) {
@@ -253,11 +276,14 @@ function handleTeamAction(action) {
     teamChange(s,'libero-switch',old,p.id,s.positions.indexOf(s.libero.replacedId)+1,before);
   } else if (action === 'team-undo-change') {
     const change = s.changes.at(-1);
-    if (!change || change.rallyCount !== s.rallies.length || !change.before || change.type === 'libero-auto-out') { toast('Solo se puede deshacer un cambio anterior al próximo punto.'); return true; }
+    if (!change || change.rallyCount !== s.rallies.length || !change.before || change.automatic || change.type === 'libero-auto-out') { toast('Solo se puede deshacer un cambio anterior al próximo punto.'); return true; }
+    if(change.side==='them'){toast('Corregí los cambios rivales desde su formación.');return true;}
+    s.liberoManual=structuredCloneSafe(change.before.liberoManual||{});s.tacticalOverrides=structuredCloneSafe(change.before.tacticalOverrides||{});
     s.positions = [...change.before.positions]; s.libero = change.before.libero ? {...change.before.libero} : null;
     if(change.before.serve)s.serve=change.before.serve;if(change.before.rotation)s.rotation=change.before.rotation;s.changes.pop();
   } else return true;
-  save(); render(); toast('Cambio guardado.'); return true;
+  if(action.startsWith('team-libero-'))VolleyCourt.manualLibero(s,'us');
+  VolleyCourt.sync(m,s);save(); render(); toast('Cambio guardado.'); return true;
 }
 document.addEventListener('change', e => {
   const t = e.target;
@@ -274,19 +300,19 @@ document.addEventListener('change', e => {
   const m = activeMatch(), s = activeSet();
   if (t.matches('[data-initial-position]') && m && s) {
     teamSet(s);
-    if (s.finished || s.rallies.length || s.changes.length || s.libero || !betweenRallies(s)) { render(); return; }
+    if (s.finished || s.rallies.length || s.changes.some(c=>!c.automatic) || s.libero&&!VolleyCourt.enabled(m,s) || !betweenRallies(s)) { render(); return; }
     const idx = +t.dataset.initialPosition, p = playerById(m,t.value);
     if (!p || p.isLibero || idx < 0 || idx > 5) { render(); return; }
     const old = s.positions[idx], other = s.positions.indexOf(p.id);
     if (other >= 0) s.positions[other] = old;
-    s.positions[idx] = p.id; s.initialLineup = [...s.positions]; s.initialLineupInferred = false;
+    s.positions[idx] = p.id; s.initialLineup = [...s.positions];VolleyCourt.sync(m,s); s.initialLineupInferred = false;
     save(); render();
   }
   if (t.matches('[data-player-libero]') && m && s) {
     const p = playerById(m,t.dataset.playerLibero);
     if (!p) return;
     if (!setLiberoDesignation(p,t.checked,m.players,m)) {render();return;}
-    rememberPlayerPosition(m,p);save();render();
+    rememberPlayerPosition(m,p);if(!pending.length){VolleyCourt.sync(m,s);if(VolleyCourt.enabled(m,s))beginRallyFlow();}save();render();
   }
 });
 document.addEventListener('input', e => {

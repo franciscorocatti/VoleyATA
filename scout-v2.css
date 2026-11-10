@@ -173,3 +173,16 @@
 @media(min-width:700px) and (max-width:1000px){.scout-v2 .v2-console{grid-template-columns:minmax(245px,.85fr) minmax(0,1.15fr);gap:12px}.scout-v2 .v2-entry-card{padding:12px}.scout-v2 .v2-outcomes .outcome{min-height:65px;font-size:15px}.flow-teams .jersey.kit-shirt{width:40px;min-width:40px;height:42px;flex-basis:40px}.flow-teams .kit-number{font-size:16px}}
 @media(min-width:1001px){.flow-teams .player{min-height:106px}.scout-v2 .v2-outcomes .outcome{min-height:74px}}
 @media(max-width:699px){.flow-stat-filters{grid-template-columns:1fr 1fr}.flow-maps{grid-template-columns:1fr}.flow-teams .player{min-height:100px}.flow-direction{grid-template-columns:75px 1fr}.flow-direction span{grid-column:1/-1}.flow-statistics .card{padding:12px}}
+.scout-v2 .flow-skills-4,.scout-v2 .flow-skills-5{grid-template-columns:repeat(2,minmax(0,1fr))}
+.scout-v2 .flow-skills-5 .skill:last-child{grid-column:1/-1}
+.scout-v2 .flow-skills-4 .skill,.scout-v2 .flow-skills-5 .skill{min-height:70px;font-size:16px;padding:12px 8px}
+.scout-v2 .flow-skills-4 svg,.scout-v2 .flow-skills-5 svg{width:29px;height:29px;flex-basis:29px}
+.flow-recover-skills{width:100%;margin:9px 0 0;white-space:normal;text-align:center}
+.court-layout-editor label{display:block;margin:10px 0;font-size:12px}
+.court-layout-editor select{min-height:44px}
+@media(max-width:699px){.scout-v2 .flow-skills-4 .skill,.scout-v2 .flow-skills-5 .skill{min-height:60px;font-size:14px}}
+.row>input[data-court-auto],.row>input[data-court-setup]{width:20px;min-width:20px;height:20px;min-height:20px;flex:0 0 20px;accent-color:var(--primary)}
+
+/* Tendencias compactas durante el partido. */
+.flow-statistics[data-report-mode=live] .flow-map svg{max-height:260px}
+.flow-statistics[data-report-mode=live] .flow-heat button{min-height:76px}

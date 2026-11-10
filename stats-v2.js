@@ -17,6 +17,27 @@
     block:['point','positive_touch','uncontrolled_touch','fault'],defense:['perfect','positive','limited','direct_error'],setting:['perfect','good','forced','direct_error']
   };
   const own = (object,key) => Object.prototype.hasOwnProperty.call(object || {},key);
+  function forSide(match,side='us') {
+    if(match._statisticsPerspective)return match;
+    const teamOf=a=>a.side==='them'||a.skill==='rival_attack'?'them':'us';
+    const inverse=x=>x==='us'?'them':x==='them'?'us':x;
+    return {...match,_statisticsPerspective:side,team:side==='us'?match.team:match.opponent,opponent:side==='us'?match.opponent:match.team,
+      players:side==='us'?match.players:match.rivalPlayers||[],sets:(match.sets||[]).map(set=>({...set,rallies:(set.rallies||[]).map(r=>{
+        const actions=[];
+        for(const [globalOrder,a] of (r.actions||[]).entries()){
+          if(teamOf(a)===side){actions.push({...a,side:'us',skill:a.skill==='rival_attack'?'attack':a.skill,metadata:{...a.metadata,globalOrder}});}
+          else if(a.skill==='rival_attack'&&side==='us')actions.push(a);
+          else if(a.skill==='attack'&&['blocked_point','covered_block'].includes(a.outcomeId)&&a.metadata?.rallyFlow){
+            // A view of an observed block result, not a stored additional contact.
+            // A separate explicitly linked block takes precedence.
+            if(r.actions.some(b=>b.skill==='block'&&teamOf(b)===side&&b.metadata?.relatedActionId===a.id))continue;
+            const ids=a.metadata.blockers||[];
+            actions.push({...a,id:a.id+':block-view',side:'us',skill:'block',outcomeId:a.outcomeId==='blocked_point'?'point':'positive_touch',playerId:ids[0]||null,participants:ids,metadata:{...a.metadata,derivedBlockFrom:a.id}});
+          }
+        }
+        return {...r,actions,serveBefore:side==='us'?r.serveBefore:inverse(r.serveBefore),winner:side==='us'?r.winner:inverse(r.winner),rotation:side==='us'?r.rotation:r.opponentBefore?.rotation??r.before?.opponentLineup?.rotation??null};
+      })}))};
+  }
   function resolveOutcome(action,rally) {
     if (!action) return {outcomeId:'unknown',ambiguous:false,terminal:false};
     if (root.VolleyData?.getActionResult) return root.VolleyData.getActionResult(action,rally);
@@ -51,6 +72,7 @@
     return (match.sets || []).flatMap(set => (setFilter === 'all' || String(set.number) === String(setFilter)) ? (set.rallies || []).filter(r=>r.status !== 'open' && ['us','them'].includes(r.winner)).map(r=>({...r,setNo:set.number})) : []);
   }
   function entries(match,filter='all') {
+    match=forSide(match);
     return rallies(match,filter).flatMap(rally=>(rally.actions || []).map((action,index)=>({action,rally,index,result:resolveOutcome(action,rally)})));
   }
   const percent = (n,d) => d ? 100*n/d : null;
@@ -67,6 +89,8 @@
     return a.skill === 'attack' && !a.metadata?.freeBall && !a.isFreeBall && !['free_ball','freeball'].includes(a.metadata?.attackType);
   }
   function summarize(list,config) {
+    const coverages=list.filter(e=>e.action.skill==='defense'&&e.action.metadata?.defenseKind==='coverage');
+    list=list.filter(e=>!coverages.includes(e));
     const count = (skill,id) => list.filter(e=>e.action.skill === skill && e.result.outcomeId === id).length;
     const total = skill => list.filter(e=>e.action.skill === skill).length;
     const attackEntries = list.filter(attackAttempt);
@@ -99,6 +123,7 @@
     }
     for(const bucket of Object.values(byRole))bucket.efficiency=percent(bucket.kills-bucket.errors,bucket.attempts);
     return {
+      coverage:{total:coverages.length,perfect:coverages.filter(e=>e.result.outcomeId==='perfect').length,positive:coverages.filter(e=>e.result.outcomeId==='positive').length,limited:coverages.filter(e=>e.result.outcomeId==='limited').length,directErrors:coverages.filter(e=>e.result.outcomeId==='direct_error').length},
       attack:{total:attackEntries.length,attempts:attackEntries.length,kills:K,conventionalKills,unspecifiedKills,useBlockOutKills,tipKills,tipContinues:ac('tip_continue'),errors:E,continues:ac('continue')+ac('tip_continue'),coveredBlocks:ac('covered_block'),blockedPoints:blocked,ambiguousBlocks:ac('ambiguous_block'),efficiency:percent(K-E,attackEntries.length),killPct:percent(K,attackEntries.length),origin,destination,phase,byRole},
       serve:{total:total('serve'),aces:count('serve','ace'),positive:count('serve','positive'),neutral:count('serve','neutral'),errors:count('serve','error'),acePct:percent(count('serve','ace'),total('serve')),errorPct:percent(count('serve','error'),total('serve'))},
       reception:{...reception,perfectPct:percent(reception.q3,reception.total),positivePct:percent(reception.q2+reception.q3,reception.total),errorPct:percent(reception.q0,reception.total)},
@@ -113,6 +138,7 @@
     for (const e of list) {
       if (e.action.skill !== 'attack' || !['kill','use_block_out','tip_kill'].includes(e.result.outcomeId) || e.rally.winner !== 'us' || !e.index || e.index !== e.rally.actions.length-1 || !attackAttempt(e)) continue;
       const previous=e.rally.actions[e.index-1],r=resolveOutcome(previous,e.rally);
+      if(previous.metadata?.globalOrder!=null&&e.action.metadata?.globalOrder!==previous.metadata.globalOrder+1)continue;
       if (previous.skill !== 'setting' || !['perfect','good','forced'].includes(r.outcomeId)) continue;
       const receiver=previous.metadata?.receiverId || previous.receiverId;
       if ((receiver && receiver !== e.action.playerId) || (config.assistRequiresReceiver && !receiver)) continue;
@@ -140,6 +166,7 @@
   }
   function configFor(match) {return {...configured,...(match.statisticsConfig || {})};}
   function getMatchData(match,filter='all') {
+    match=forSide(match);
     const rs=rallies(match,filter),list=entries(match,filter),config=configFor(match),summary=summarize(list,config),assists=assistEntries(list,config);
     summary.setting.assists=assists.length;
     const as=list.map(e=>({...e.action,resolvedOutcomeId:e.result.outcomeId,rallyId:e.rally.id,setNo:e.rally.setNo,winner:e.rally.winner}));
@@ -150,6 +177,7 @@
       offense:{origin:summary.attack.origin,destination:summary.attack.destination,phase:summary.attack.phase},config};
   }
   function getPlayerStats(match,filter='all') {
+    match=forSide(match);
     const list=entries(match,filter),config=configFor(match),assists=assistEntries(list,config);
     return (match.players || []).map(p=>{
       const playerEntries=list.filter(e=>participants(e.action).includes(p.id)),s=summarize(playerEntries,config),a=s.attack;
@@ -180,6 +208,6 @@
     <details><summary>Ataque por jugador y variante</summary><div class="tablewrap"><table><thead><tr><th>Jugador</th><th>Convencional</th><th>Use / block-out</th><th>Toque / colocada punto</th><th>Sin variante registrada</th><th>Kills totales</th><th>Eficacia general</th></tr></thead><tbody>${players.map(x=>`<tr><td>${escape('#'+x.p.number+' '+x.p.name)}</td><td>${x.conventionalKills}</td><td>${x.useBlockOutKills}</td><td>${x.tipKills}</td><td>${x.unspecifiedKills}</td><td>${x.K}</td><td>${rate(x.eff)}</td></tr>`).join('')}</tbody></table></div><p class="hinttext">Los puntos anteriores sin técnica identificada conservan sus kills e intentos en «Sin variante registrada».</p></details><details style="margin-top:12px"><summary>Asistencias y bloqueos por jugador</summary><div class="tablewrap"><table><thead><tr><th>Jugador</th><th>Asistencias</th><th>Bloqueos individuales</th><th>Participaciones en bloqueo asistido</th><th>Composición desconocida</th></tr></thead><tbody>${players.map(x=>`<tr><td>${escape('#'+x.p.number+' '+x.p.name)}</td><td>${x.assists}</td><td>${x.blkSolo}</td><td>${x.blkAssisted}</td><td>${x.blkUnknown}</td></tr>`).join('')}</tbody></table></div></details>
     <details style="margin-top:12px"><summary>Distribución ofensiva: origen y destino</summary><div class="tablewrap"><table><thead><tr><th>Zona</th><th>Origen propio</th><th>Destino rival</th></tr></thead><tbody>${zoneRows}</tbody></table></div><p class="hinttext">Fase registrada: recepción ${s.attack.phase.reception} · contraataque ${s.attack.phase.counterattack} · sin identificar ${s.attack.phase.unknown}. No se inventan zonas ni fases ausentes.</p></details></div>`;
   }
-  root.StatsV2={summarizeEntries:(list,config={})=>summarize(list,{...defaults,...config}),resolveOutcome,participants,rallies,entries,getMatchData,getPlayerStats,renderStatisticsV2,zoneOf,dataQuality,configure:settings=>(configured={...configured,...settings}),defaults:{...defaults}};
+  root.StatsV2={forSide,summarizeEntries:(list,config={})=>summarize(list,{...defaults,...config}),resolveOutcome,participants,rallies,entries,getMatchData,getPlayerStats,renderStatisticsV2,zoneOf,dataQuality,configure:settings=>(configured={...configured,...settings}),defaults:{...defaults}};
   root.renderStatisticsV2=renderStatisticsV2;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

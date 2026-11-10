@@ -12,11 +12,11 @@ function playerPosition(p){
 function positionOptions(p){const position=playerPosition(p);return '<option value="">Sin registrar</option>'+Object.entries(attackPositions).map(([v,l])=>`<option value="${v}" ${position===v?'selected':''}>${l}</option>`).join('');}
 function rosterPositionField(p,attrs){return `<label class="roster-position">Puesto habitual<select ${attrs}>${positionOptions(p)}</select></label>`;}
 
-function attackContext(){const s=activeSet(),p=playerById(activeMatch(),selectedPlayerId);const computed=VolleyPosition.forPlayer(selectedPlayerId,{positions:s?.positions,libero:s?.libero});return {player:p,role:attackRoleOverride==='auto'?computed.role:attackRoleOverride};}
+function attackContext(){const s=activeSet(),modern=typeof flowEnabled==='function'&&flowEnabled(),p=modern?flowPlayer(activeMatch(),selectedPlayerId):playerById(activeMatch(),selectedPlayerId);const computed=VolleyPosition.forPlayer(selectedPlayerId,modern?{positions:VolleyRally.positions(s,activeSide)}:{positions:s?.positions,libero:s?.libero});return {player:p,role:attackRoleOverride==='auto'?computed.role:attackRoleOverride};}
 function habitualAttackZones(position,role){return (role==='front'?{outside:[4,2],opposite:[2,4],middle:[3],setter:[2,3]}:role==='back'?{outside:[6,1],opposite:[1]}:{})[position]||[];}
 function defaultAttackOrigin(){const c=attackContext();return habitualAttackZones(playerPosition(c.player),c.role)[0]??null;}
 function renderAttackControls(){const c=attackContext(),zones=habitualAttackZones(playerPosition(c.player),c.role);if(originZone===null&&!attackOriginManual&&editingActionIndex===null)originZone=zones[0]??null;
-return attackRoleControl()+`<small class="attack-position-label">${esc(attackPositions[playerPosition(c.player)]||'Puesto sin registrar')} · del plantel</small><details class="v2-extra"><summary>Corregir puesto habitual</summary><label>Puesto<select data-attack-position>${positionOptions(c.player)}</select></label></details><div class="attack-fast" aria-label="Origen">${zones.map(z=>`<button class="btn ${originZone===z?'btn-primary':''}" data-action="attack-origin" data-zone="${z}" aria-pressed="${originZone===z}">Zona ${z}</button>`).join('')}</div>${!zones.length?renderZoneGrid('origin','Origen del ataque',originZone):''}<strong>Dirección</strong><div class="attack-fast">${['diagonal','paralela','olla'].map(d=>`<button class="btn ${attackDirection===d?'btn-primary':''}" data-action="attack-direction" data-direction="${d}" aria-pressed="${attackDirection===d}">${d.toUpperCase()}</button>`).join('')}</div><button class="btn btn-small" data-action="attack-skip">${attackDirectionSkipped?'Dirección omitida':'Omitir dirección'}</button><div class="attack-fast">${[['conventional','REMATE'],['tip','TOQUE / COLOCADA'],['use_block_out','USE / BLOCK-OUT']].map(([v,l])=>`<button class="btn ${attackType===v?'btn-primary':''}" data-action="attack-type" data-type="${v}" aria-pressed="${attackType===v}">${l}</button>`).join('')}</div>`;
+return attackRoleControl()+`<small class="attack-position-label">${esc(attackPositions[playerPosition(c.player)]||'Puesto sin registrar')} · del plantel</small><details class="v2-extra"><summary>Corregir puesto habitual</summary><label>Puesto<select data-attack-position>${positionOptions(c.player)}</select></label></details><div class="attack-fast" aria-label="Origen">${zones.map(z=>`<button class="btn ${originZone===z?'btn-primary':''}" data-action="attack-origin" data-zone="${z}" aria-pressed="${originZone===z}">Zona ${z}</button>`).join('')}</div>${!zones.length?renderZoneGrid('origin','Origen del ataque',originZone):''}<strong>Dirección</strong><div class="attack-fast">${['diagonal','paralela','olla','zona1','zona5'].map(d=>`<button class="btn ${attackDirection===d?'btn-primary':''}" data-action="attack-direction" data-direction="${d}" aria-pressed="${attackDirection===d}">${d.toUpperCase()}</button>`).join('')}</div><button class="btn btn-small" data-action="attack-skip">${attackDirectionSkipped?'Dirección omitida':'Sin dirección · calcular con defensa'}</button><div class="attack-fast">${[['conventional','REMATE'],['tip','TOQUE / COLOCADA'],['use_block_out','USE / BLOCK-OUT']].map(([v,l])=>`<button class="btn ${attackType===v?'btn-primary':''}" data-action="attack-type" data-type="${v}" aria-pressed="${attackType===v}">${l}</button>`).join('')}</div>`;
 }
 function attackOutcomeVisible(out){return attackType==='use_block_out'?out.id==='use_block_out':attackType==='tip'?['tip_kill','tip_continue','error'].includes(out.id):!['use_block_out','tip_kill','tip_continue'].includes(out.id);}
 function attackSuggestions(action,index){
@@ -41,7 +41,7 @@ if(['attack-blocker','attack-blocker-clear','attack-blocker-player'].includes(ac
   }
 }
 save();render();return true;}
-document.addEventListener('change',event=>{const t=event.target;if(t.matches('[data-attack-position]')){const p=attackContext().player;if(p){if(!assignPlayerPosition(p,t.value,activeMatch())){render();return;}attackOriginManual=false;originZone=defaultAttackOrigin();resetRivalBlockerSelection(useBlockerDraft);save();render();}}});
+document.addEventListener('change',event=>{const t=event.target;if(t.matches('[data-attack-position]')){const p=attackContext().player;if(p){if(!assignPlayerPosition(p,t.value,activeMatch())){render();return;}attackOriginManual=false;originZone=defaultAttackOrigin();if(typeof flowEnabled==='function'&&flowEnabled())flowOriginSource=originZone?'role-zone':'unknown';resetRivalBlockerSelection(useBlockerDraft);save();render();}}});
 
 function renderDraftPositions(){return '<details class="v2-extra"><summary>Puestos habituales del plantel</summary>'+setupDraft.players.map((p,i)=>`<div><strong>#${esc(p.number)} ${esc(p.name)}</strong>${rosterPositionField(p,`data-roster-position="${i}"`)}</div>`).join('')+'</details>';}
 function renderMatchPositions(m){return '<div class="card"><h2>Puestos habituales</h2>'+m.players.map(p=>`<div><strong>#${esc(p.number)} ${esc(p.name)}</strong>${rosterPositionField(p,`data-match-position="${esc(p.id)}"`)}</div>`).join('')+'</div>';}
@@ -51,6 +51,15 @@ function resetRivalBlockerSelection(target){setRivalBlockers(target,[]);delete t
 
 function assignPlayerPosition(player,value,match=null){
   if(value!==''&&!Object.prototype.hasOwnProperty.call(attackPositions,value))return false;
+  if(match?.rivalPlayers?.includes(player)){
+    const libero=value==='libero';
+    if(!!player.isLibero!==libero){
+      if(match.sets.some(s=>s.opponentLineup?.current.some(p=>p.id===player.id)||s.rallies.some(r=>r.actions.some(a=>a.playerId===player.id)))){toast('La designación de líbero rival se conserva una vez que participó o ingresó en formación.');return false;}
+      if(libero&&match.rivalPlayers.filter(p=>p!==player&&p.isLibero).length>=2){toast('Hasta dos líberos rivales.');return false;}
+    }
+    player.position=value;player.isLibero=libero;delete player.attackPosition;
+    return true;
+  }
   const players=match?.players||setupDraft.players;
   if(!setLiberoDesignation(player,value==='libero',players,match))return false;
   player.attackPosition=value;

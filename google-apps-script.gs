@@ -77,7 +77,7 @@ function preparePayload(input) {
       if (p.isLibero) data.liberos.push([m.id,p.id,p.number,p.name]);
     }
     const rivalAttackers=new Map();
-    for(const p of (m.rivalPlayers||[])){if(!isRecord(p)||!isID(p.id)||rivalAttackers.has(p.id)||!/^\d{1,3}$/.test(p.number)||!['outside','opposite','middle','setter','libero'].includes(p.position))throw new Error('Atacante rival inválido');rivalAttackers.set(p.id,p);data.atacantesRivales.push([m.id,p.id,p.number,p.position,p.name||'']);}
+    for(const p of (m.rivalPlayers||[])){if(!isRecord(p)||!isID(p.id)||rivalAttackers.has(p.id)||(!p.provisional&&!/^\d{1,3}$/.test(p.number))||!['','outside','opposite','middle','setter','libero'].includes(p.position??''))throw new Error('Atacante rival inválido');rivalAttackers.set(p.id,p);data.atacantesRivales.push([m.id,p.id,p.number,p.position,p.name||'']);}
     data.partidos.push([m.id,m.date,m.team,m.opponent,m.createdAt,now]);
     const setNumbers = new Set(), rallyIDs = new Set(), actionIDs = new Set();
     for (const s of m.sets) {
@@ -98,7 +98,7 @@ function preparePayload(input) {
           const p = o.initial[i];
           if (!isRecord(p)) throw new Error('Jugador rival inválido');
           textValue(p.number,'Número rival'); textValue(p.name || '','Nombre rival');
-          const current = o.current.findIndex(x => isRecord(x) && x.number === p.number)+1;
+          const current = o.current.findIndex(x => isRecord(x) && (p.id?x.id===p.id:x.number === p.number))+1;
           data.rival.push([m.id,m.opponent,s.number,i+1,p.number,p.name || '',current,o.rotation,o.scoreAtRegistration.us,o.scoreAtRegistration.them]);
         }
       }
@@ -110,7 +110,7 @@ function preparePayload(input) {
       for (const c of (s.changes || [])) {
         if (!isRecord(c)) throw new Error('Cambio inválido');
         scoreValue(c.score,'Marcador de cambio'); rotationValue(c.rotation);
-        const out=players.get(c.outgoing), incoming=players.get(c.incoming);
+        const changeRoster=c.side==='them'?rivalAttackers:players;const out=changeRoster.get(c.outgoing), incoming=changeRoster.get(c.incoming);
         data.cambios.push([m.id,s.number,c.id,c.timestamp,c.type,c.score.us,c.score.them,c.rotation,c.position,out ? out.number:'',out ? out.name:'',incoming ? incoming.number:'',incoming ? incoming.name:'']);
       }
       data.sets.push([m.id,s.number,s.score.us,s.score.them,!!s.finished,s.winner === 'us' ? m.team : s.winner === 'them' ? m.opponent:'',s.rotation]);
@@ -134,13 +134,13 @@ function preparePayload(input) {
             if (!isRecord(a) || !Object.prototype.hasOwnProperty.call(OUTCOMES_V2,a.skill)) throw new Error('Fundamento de acción inválido');
             if (a.schemaVersion !== undefined && a.schemaVersion !== 1 && a.schemaVersion !== 2) throw new Error('Versión de acción incompatible');
             if (a.schemaVersion === 2) v2=true;
-            if (a.playerId != null && !(a.skill==='rival_attack'?rivalAttackers:players).has(a.playerId)) throw new Error('La acción pertenece a un jugador inexistente');
-            p=(a.skill==='rival_attack'?rivalAttackers:players).get(a.playerId) || null;
+            if (a.playerId != null && !(a.skill==='rival_attack'||a.side==='them'?rivalAttackers:players).has(a.playerId)) throw new Error('La acción pertenece a un jugador inexistente');
+            p=(a.skill==='rival_attack'||a.side==='them'?rivalAttackers:players).get(a.playerId) || null;
             participants = a.participants === undefined ? (a.playerId ? [a.playerId]:[]) : a.participants;
-            if (!Array.isArray(participants) || participants.some(id=>!players.has(id)) || new Set(participants).size !== participants.length) throw new Error('Participantes de acción inválidos');
+            if (!Array.isArray(participants) || participants.some(id=>!(a.side==='them'?rivalAttackers:players).has(id)) || new Set(participants).size !== participants.length) throw new Error('Participantes de acción inválidos');
             if (a.metadata !== undefined && !isRecord(a.metadata)) throw new Error('Metadatos de acción inválidos');
             meta=a.metadata || {};
-            for (const field of ['setterId','receiverId']) if (meta[field] != null && !players.has(meta[field])) throw new Error('Jugador relacionado inexistente');
+            for (const field of ['setterId','receiverId']) if (meta[field] != null && !(a.side==='them'?rivalAttackers:players).has(meta[field])) throw new Error('Jugador relacionado inexistente');
             if (meta.rivalBlockers !== undefined && (!Array.isArray(meta.rivalBlockers) || meta.rivalBlockers.some(b=>!isRecord(b)))) throw new Error('Bloqueadores rivales inválidos');
             aid=a.id || r.id+'-action-'+(ai+1);
             if (!isID(aid) || actionIDs.has(aid)) throw new Error('ID de acción inválido o repetido');
@@ -155,14 +155,14 @@ function preparePayload(input) {
               if (!['serve','attack'].includes(a.skill) && origin == null) origin=a.zone;
             }
             const rivals=meta.rivalBlockers || (a.blocker ? [a.blocker]:[]);
-            if (a.skill === 'attack' && ['blocked_point','covered_block','ambiguous_block'].includes(view.id)) {
+            if (a.side!=='them' && a.skill === 'attack' && ['blocked_point','covered_block','ambiguous_block'].includes(view.id)) {
               const blocker=rivals[0] || {};
               data.bloqueos.push([m.id,s.number,r.id,r.timestamp,p ? p.number:'',p ? p.name:'',blocker.number || '',blocker.name || '',view.id === 'blocked_point']);
             }
             data.accionesV2.push([m.id,setId,s.number,r.id,aid,ai+1,a.schemaVersion || 1,a.playerId || '',jsonCell(participants),a.skill,view.id,a.outcome || '',origin,destination,r.mode || 'legacy',view.ambiguous,meta.setterId || '',meta.receiverId || '',meta.settingTarget || '',meta.attackPhase || '',jsonCell(rivals),jsonCell(meta),jsonCell(a)]);
           }
           const legacyZone=a ? (['serve','attack'].includes(a.skill) ? destination:origin):null;
-          data.acciones.push([m.id,m.date,m.team,m.opponent,s.number,r.id,r.timestamp,r.scoreBefore.us+(r.winner === 'us' ? 1:0),r.scoreBefore.them+(r.winner === 'them' ? 1:0),r.serveBefore === 'us' ? m.team:m.opponent,r.rotation,r.winner === 'us' ? m.team:m.opponent,p ? p.number:'',p ? p.name:'',a ? (a.skill==='rival_attack'?'Ataque rival':names[a.skill]):'',a ? view.label:'',legacyZone]);
+          data.acciones.push([m.id,m.date,m.team,m.opponent,s.number,r.id,r.timestamp,r.scoreBefore.us+(r.winner === 'us' ? 1:0),r.scoreBefore.them+(r.winner === 'them' ? 1:0),r.serveBefore === 'us' ? m.team:m.opponent,r.rotation,r.winner === 'us' ? m.team:m.opponent,p ? p.number:'',p ? p.name:'',a ? (a.skill==='rival_attack'?'Ataque rival':names[a.skill]+(a.side==='them'?' rival':'')):'',a ? view.label:'',legacyZone]);
         }
       }
     }

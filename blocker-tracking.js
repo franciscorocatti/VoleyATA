@@ -1,6 +1,6 @@
 'use strict';
 function isBlockedAttack(action) {
-  return action?.skill === 'attack' && (['covered_block','blocked_point','ambiguous_block'].includes(action.outcomeId) || ['Bloqueado','Bloqueo cubierto','Bloqueo punto'].includes(action.outcome));
+  return action?.side!=='them' && action?.skill === 'attack' && (['covered_block','blocked_point','ambiguous_block'].includes(action.outcomeId) || ['Bloqueado','Bloqueo cubierto','Bloqueo punto'].includes(action.outcome));
 }
 function isRivalBlockContact(action) {return isBlockedAttack(action)||(action?.skill==='attack'&&action.outcomeId==='use_block_out');}
 function rivalBlockerTarget(index) {return index===-1&&typeof useBlockerDraft!=='undefined'?useBlockerDraft:pending[index];}

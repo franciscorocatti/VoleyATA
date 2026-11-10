@@ -139,3 +139,37 @@
 }
 
 .block-suggested{border:2px dashed var(--primary);background:var(--primary-soft)}.inline-block-confirm{padding:12px;margin:10px 0;border:2px solid var(--primary);border-radius:12px}.attack-position-label{display:block;margin:6px 0}.roster-position{display:block;margin:8px 0}.inline-block-confirm input[type=checkbox]{width:20px;min-height:20px}.attack-fast[aria-label="Origen"]>.btn,.attack-fast[aria-label="Origen rival habitual"]>.btn{min-height:56px}
+/* Integrated match console: both teams share the existing entry card. */
+.flow-teams{display:grid;gap:12px;align-content:start;min-width:0}
+.flow-teams .v2-player-card{margin:0;padding:12px}
+.flow-teams .v2-player-card h2{font-size:15px}
+.flow-team-us{border-top:4px solid #168975}
+.flow-team-them{border-top:4px solid #657e9b}
+.flow-team-them .player.selected{background:#e3edf8;border-color:#627f9e}
+.flow-teams .player{min-height:94px;padding:6px 3px;flex-direction:column;gap:4px}
+.flow-teams .player-grid{gap:5px}
+.flow-teams .playername{font-size:12px;overflow-wrap:anywhere;white-space:normal}
+.flow-teams .playerpos{font-size:10px;white-space:normal}
+.flow-teams small{display:block;margin:8px 0}
+.flow-statistics{display:grid;gap:14px;min-width:0}
+.flow-stat-filters{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.flow-stat-filters label{min-width:0}
+.flow-metrics{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}
+.flow-metrics .value{font-size:23px}
+.flow-metrics small,.flow-metrics .label{display:block}
+.flow-maps{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.flow-map{min-width:0;padding:10px;background:#f7faf9;border-radius:12px}
+.flow-map svg{width:100%;max-height:370px;display:block}
+.flow-map svg [role=button]{cursor:pointer}
+.flow-map svg [role=button]:focus{stroke:#f4b841;stroke-opacity:.4;outline:none}
+.flow-heat{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.flow-heat button{display:flex;flex-direction:column;justify-content:center;min-height:96px;color:#102f31;white-space:normal;padding:6px}
+.flow-heat span{font-size:12px}
+.flow-heat small{font-size:10px}
+.flow-direction{display:grid;grid-template-columns:85px 100px 1fr;align-items:center;gap:8px;margin:9px 0;font-size:13px}
+.flow-direction meter{width:100%}
+.rival-roster-row{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px 0;border-bottom:1px solid #d8e5e0}
+.rival-roster-row strong{grid-column:1/-1}
+@media(min-width:700px) and (max-width:1000px){.scout-v2 .v2-console{grid-template-columns:minmax(245px,.85fr) minmax(0,1.15fr);gap:12px}.scout-v2 .v2-entry-card{padding:12px}.scout-v2 .v2-outcomes .outcome{min-height:65px;font-size:15px}.flow-teams .jersey.kit-shirt{width:40px;min-width:40px;height:42px;flex-basis:40px}.flow-teams .kit-number{font-size:16px}}
+@media(min-width:1001px){.flow-teams .player{min-height:106px}.scout-v2 .v2-outcomes .outcome{min-height:74px}}
+@media(max-width:699px){.flow-stat-filters{grid-template-columns:1fr 1fr}.flow-maps{grid-template-columns:1fr}.flow-teams .player{min-height:100px}.flow-direction{grid-template-columns:75px 1fr}.flow-direction span{grid-column:1/-1}.flow-statistics .card{padding:12px}}

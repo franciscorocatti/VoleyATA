@@ -1,7 +1,7 @@
 'use strict';
 let attackRoleOverride='auto',quickCausesOpen=false;
 function attackRoleControl(){
-  const s=activeSet(),computed=VolleyPosition.forPlayer(selectedPlayerId,{positions:s?.positions,libero:s?.libero});
+  const s=activeSet(),computed=VolleyPosition.forPlayer(selectedPlayerId,typeof flowEnabled==='function'&&flowEnabled()?{positions:VolleyRally.positions(s,activeSide)}:{positions:s?.positions,libero:s?.libero});
   const role=['front','back','unknown'].includes(attackRoleOverride)?attackRoleOverride:computed.role;
   return `<details class="v21-role-control"><summary><span class="v21-role ${role}">${VolleyPosition.labels[role]}</span><small> · corregir</small></summary><label>Clasificación de este ataque<select data-v21-role><option value="auto" ${attackRoleOverride==='auto'?'selected':''}>Automática${computed.position?' · P'+computed.position:''}</option>${Object.entries(VolleyPosition.labels).map(([value,label])=>`<option value="${value}" ${attackRoleOverride===value?'selected':''}>${label}</option>`).join('')}</select></label><p class="hinttext">La corrección afecta a este ataque; no cambia la formación ni los puntos anteriores.</p></details>`;
 }

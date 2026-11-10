@@ -9,7 +9,7 @@ function sequenceOutcome(action,rally) {
 // Definición acordada: el primer ataque propio del rally debe terminar en punto.
 function directPointSequence(rally) {
   if (rally.winner !== 'us' || !Array.isArray(rally.actions)) return null;
-  const actions = rally.actions;
+  const actions = rally.actions.map(a=>a.side==='them'?{...a,skill:a.skill==='attack'?'rival_attack':'rival_'+a.skill}:a);
   const attackIndex = actions.findIndex(a => a.skill === 'attack');
   if (attackIndex < 0 || attackIndex !== actions.length-1 || !['kill','use_block_out','tip_kill'].includes(sequenceOutcome(actions[attackIndex],rally).outcomeId)) return null;
   const before = actions.slice(0,attackIndex);

@@ -1,4 +1,55 @@
 'use strict';
+function enableRallyFlow(m,set,seed){
+  m.rallyAutomation=2;m.rivalPlayers ||= [];
+  const source=seed||set.opponentLineup?.current||Array.from({length:6},()=>({}));
+  const used=new Set();
+  const rows=source.map((row,i)=>{
+    let p=m.rivalPlayers.find(p=>row.id?p.id===row.id:row.number&&p.number===row.number);
+    if(!p){p={id:row.id||uid(),number:row.number?.trim()||'Rival '+(i+1),name:row.name?.trim()||'',position:row.position||'',isLibero:false,provisional:!row.number?.trim()||!!row.provisional};m.rivalPlayers.push(p);}
+    if(used.has(p.id))throw Error('La formación rival tiene identidades repetidas.');used.add(p.id);
+    return {...p};
+  });
+  set.opponentLineup={...(set.opponentLineup||{}),initial:set.opponentLineup?.initial?.every(p=>p.id)?set.opponentLineup.initial:structuredCloneSafe(rows),current:rows,rotation:set.opponentLineup?.rotation||1,recordedAtRally:set.opponentLineup?.recordedAtRally??set.rallies.length,scoreAtRegistration:{...set.score},libero:set.opponentLineup?.libero||null};
+}
+function reconcileRivalLibero(m,set){
+  const line=set?.opponentLineup,lib=line?.libero;if(!lib)return;
+  const pos=line.current.findIndex(p=>p.id===lib.replacedId)+1;
+  if(![1,5,6].includes(pos)||pos===1&&set.serve==='them'){
+    set.changes ||= [];set.changes.push({id:uid(),type:'rival-libero-auto-out',side:'them',score:{...set.score},rotation:set.rotation,timestamp:new Date().toISOString(),rallyCount:set.rallies.length,outgoing:lib.playerId,incoming:lib.replacedId,position:pos});line.libero=null;
+  }
+}
+function renderRivalTeamControls(m){
+  if(m.rallyAutomation!==2)return '<div class="card"><h2>Scouting de ambos equipos</h2><p>Los registros históricos se conservan. Activá el panel integrado para las próximas acciones.</p><button class="btn btn-primary" data-action="flow-enable">Activar scouting integral</button></div>';
+  const s=activeSet(),line=s.opponentLineup,roster=m.rivalPlayers||[],ids=VolleyRally.positions(s,'them',false);
+  return `<section class="card"><h2>Plantel rival · ${esc(m.opponent)}</h2><p class="hinttext">Rival 1–6 son referencias provisionales, no dorsales confirmados. Identificá cada referencia cuando la reconozcas; conserva su ID. Cambios y formación se registran entre rallies.</p>${roster.map(p=>`<div class="rival-roster-row"><strong>${p.provisional?'Referencia provisional':'#'+esc(p.number)}</strong><label>Dorsal<input data-flow-rival="${esc(p.id)}" data-prop="number" value="${p.provisional?'':esc(p.number)}" maxlength="3" inputmode="numeric" placeholder="Sin identificar"></label><label>Nombre<input data-flow-rival="${esc(p.id)}" data-prop="name" value="${esc(p.name)}" maxlength="60"></label><label>Puesto<select data-flow-rival="${esc(p.id)}" data-prop="position">${positionOptions(p)}</select></label></div>`).join('')}<button class="btn" data-action="flow-rival-add">Agregar suplente rival</button><h3>Formación actual · R${line?.rotation||1}</h3><div class="lineup-grid">${[4,3,2,5,6,1].map(pos=>`<label>P${pos}<select data-flow-lineup="${pos-1}">${roster.filter(p=>!p.isLibero).map(p=>`<option value="${esc(p.id)}" ${ids[pos-1]===p.id?'selected':''}>${esc(p.number)} ${esc(p.name)}</option>`).join('')}</select></label>`).join('')}</div><p class="hinttext">Elegir un suplente registra sustitución; elegir otro titular intercambia posiciones como corrección manual.</p><button class="btn" data-action="flow-rival-rotate">Corregir: rotar rival una posición</button><h3>Líbero rival</h3>${line?.libero?`<p>${esc(roster.find(p=>p.id===line.libero.playerId)?.number)} en cancha</p><button class="btn" data-action="flow-rival-libero-out">Retirar líbero rival</button>`:`<label>Líbero<select id="flow-libero">${teamOptions(roster.filter(p=>p.isLibero),'')}</select></label><label>Reemplaza a<select id="flow-libero-replaced">${teamOptions(roster.filter(p=>ids.includes(p.id)&&[1,5,6].includes(ids.indexOf(p.id)+1)&&!(ids.indexOf(p.id)===0&&s.serve==='them')),'')}</select></label><button class="btn" data-action="flow-rival-libero-in">Ingresar líbero rival</button>`}<label class="row"><input type="checkbox" data-flow-scheme ${m.receptionScheme?'checked':''}>Usar esquema de recepción propio</label></section>`;
+}
+function recordRivalChange(type,mutate){
+  const m=activeMatch(),s=activeSet();if(!s||!betweenRallies(s))return false;
+  const before=structuredCloneSafe(s.opponentLineup);mutate(s,m);s.changes ||= [];
+  const lib=s.opponentLineup.libero||before.libero,libChange=type.includes('libero');
+  s.changes.push({id:uid(),type,side:'them',score:{...s.score},rotation:s.rotation,position:0,outgoing:libChange?(type==='rival-libero-in'?lib.replacedId:lib.playerId):before.current.find((p,i)=>p.id!==s.opponentLineup.current[i]?.id)?.id||before.current[0].id,incoming:libChange?(type==='rival-libero-in'?lib.playerId:lib.replacedId):s.opponentLineup.current.find((p,i)=>p.id!==before.current[i]?.id)?.id||before.current[0].id,rallyCount:s.rallies.length,beforeOpponent:before,opponentAfter:structuredCloneSafe(s.opponentLineup),timestamp:new Date().toISOString()});
+  reconcileRivalLibero(m,s);beginRallyFlow();save();render();return true;
+}
+document.addEventListener('change',e=>{
+  const t=e.target,m=activeMatch();
+  if(t.matches('[data-flow-draft-role]')){setupDraft.opponentFormation ||= Array.from({length:6},()=>({number:'',name:''}));setupDraft.opponentFormation[+t.dataset.flowDraftRole].position=t.value;}
+  if(t.matches('[data-flow-bench]')){const p=setupDraft.rivalBench?.[+t.dataset.flowBench];if(p&&['number','name','position'].includes(t.dataset.prop))p[t.dataset.prop]=t.value;}
+  if(t.matches('[data-flow-setup-scheme]'))setupDraft.receptionScheme=t.checked;
+  if(t.matches('[data-flow-scheme]')&&m){m.receptionScheme=t.checked;save();render();}
+  if(t.matches('[data-flow-rival]')&&m){
+    const p=m.rivalPlayers.find(p=>p.id===t.dataset.flowRival);if(!p)return;
+    const key=t.dataset.prop,value=t.value.trim();
+    if(key==='number'&&(!/^\d{1,3}$/.test(value)||m.rivalPlayers.some(q=>q!==p&&!q.provisional&&q.number===value))){toast('Usá un dorsal único de hasta tres dígitos.');render();return;}
+    if(!['number','name','position'].includes(key))return;
+    if(key==='position'&&!['',...Object.keys(attackPositions)].includes(value))return;
+    if(key==='position'&&value==='libero'&&m.rivalPlayers.filter(q=>q.isLibero&&q!==p).length>=2){toast('Hasta dos líberos rivales.');render();return;}
+    if(key==='position'&&(p.isLibero!== (value==='libero'))&&m.sets.some(s=>s.rallies.some(r=>r.actions.some(a=>a.playerId===p.id))||VolleyRally.positions(s,'them',false).includes(p.id))){toast('Para cambiar la designación de líbero, usá un jugador sin participación y fuera de la formación.');render();return;}
+    p[key]=value;if(key==='number')p.provisional=false;if(key==='position'){p.isLibero=value==='libero';delete p.attackPosition;}save();render();
+  }
+  if(t.matches('[data-flow-lineup]')&&m){const pos=+t.dataset.flowLineup,id=t.value;
+    recordRivalChange('rival-lineup',s=>{const rows=s.opponentLineup.current,index=rows.findIndex(p=>p.id===id);if(index>=0)[rows[pos],rows[index]]=[rows[index],rows[pos]];else {const p=m.rivalPlayers.find(p=>p.id===id&&!p.isLibero);if(p)rows[pos]={...p};}s.opponentLineup.libero=null;});
+  }
+});
 // positions mantiene los seis jugadores regulares; libero es un reemplazo superpuesto.
 function teamSet(s) {
   if (!s.changes) s.changes = [];
@@ -48,9 +99,10 @@ function opponentFields(players, prefix, draft = false) {
   }).join('')}</div>`;
 }
 function opponentDraftCard() {
-  return `<div class="card" style="margin-top:16px"><h2>Formación del rival · Set 1</h2><p>Opcional: cargá los números de los seis jugadores rivales en sus posiciones iniciales. Los nombres pueden quedar vacíos.</p>${opponentFields(setupDraft.opponentFormation,'draft-rival',true)}</div>`;
+  return `<div class="card" style="margin-top:16px"><h2>Formación del rival · Set 1</h2><p>Opcional: cargá los números conocidos por posición inicial. Los espacios vacíos quedan como referencias provisionales. Podés agregar suplentes y líberos debajo.</p>${opponentFields(setupDraft.opponentFormation,'draft-rival',true)}<details class="v2-extra"><summary>Roles conocidos de titulares rivales</summary>${[4,3,2,5,6,1].map(pos=>`<label>P${pos}<select data-flow-draft-role="${pos-1}">${positionOptions(setupDraft.opponentFormation?.[pos-1]).replace(/<option value="libero"[^>]*>[^<]*<\/option>/,'')}</select></label>`).join('')}</details><details class="v2-extra"><summary>Suplentes y líberos rivales · opcionales</summary>${(setupDraft.rivalBench||[]).map((p,i)=>`<div class="rival-roster-row"><label>Dorsal<input data-flow-bench="${i}" data-prop="number" value="${esc(p.number)}" maxlength="3"></label><label>Nombre<input data-flow-bench="${i}" data-prop="name" value="${esc(p.name)}" maxlength="60"></label><label>Puesto<select data-flow-bench="${i}" data-prop="position">${positionOptions(p)}</select></label><button class="btn btn-small" data-action="flow-draft-bench-remove" data-index="${i}">Quitar suplente</button></div>`).join('')}<button class="btn" data-action="flow-draft-bench-add">Agregar suplente / líbero rival</button></details><label class="row"><input type="checkbox" data-flow-setup-scheme ${setupDraft.receptionScheme?'checked':''}>USAR ESQUEMA DE RECEPCIÓN propio</label></div>`;
 }
 function validOpponentFormation(players, optional = false) {
+  if(optional){const all=[...(players||[]),...(setupDraft.rivalBench||[]).filter(p=>p.number?.trim())];if(all.filter(p=>p.position==='libero').length>2){toast('Hasta dos líberos rivales.');return false;}const known=all.map(p=>p.number?.trim()).filter(Boolean);if(known.some(n=>!/^\d{1,3}$/.test(n))){toast('Los dorsales rivales deben tener hasta tres dígitos.');return false;}if(new Set(known).size!==known.length){toast('Los dorsales rivales no deben repetirse.');return false;}return true;}
   const empty = !players || players.every(p => !p.number?.trim() && !p.name?.trim());
   if (empty && optional) return true;
   if (!players || players.length !== 6 || players.some(p => !p.number?.trim()) || new Set(players.map(p => p.number.trim())).size !== 6) {
@@ -242,5 +294,5 @@ document.addEventListener('input', e => {
   if (!t.matches('[data-opponent-draft]')) return;
   if (!setupDraft.opponentFormation) setupDraft.opponentFormation = Array.from({length:6}, () => ({number:'',name:''}));
   const player = setupDraft.opponentFormation[+t.dataset.opponentDraft];
-  if (player && ['number','name'].includes(t.dataset.prop)) player[t.dataset.prop] = t.value;
+  if (player && ['number','name','position'].includes(t.dataset.prop)) player[t.dataset.prop] = t.value;
 });

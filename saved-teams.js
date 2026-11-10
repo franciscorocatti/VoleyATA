@@ -31,7 +31,7 @@ function loadSavedTeam(id) {
   const team = savedTeams().find(t=>t.id === id);
   if (!team || !validSavedTeam(team)) { toast('No se pudo cargar ese equipo.');return; }
   const ids = new Map(team.players.map(p=>[p.id,uid()]));
-  setupDraft.team = team.name;
+  setupDraft.team = team.name;setupDraft.receptionScheme=!!team.receptionScheme;
   setupDraft.players = team.players.map(p=>({...p,id:ids.get(p.id)}));
   setupDraft.lineup = (team.lineup || []).map(id=>ids.get(id));
   setupDraft.savedTeamId = team.id;
@@ -42,7 +42,7 @@ function loadSavedTeam(id) {
 function rememberMatchTeam(match) {
   if (setupDraft.rememberTeam === false) return;
   const team = storeTeamTemplate(match.team,match.players,match.sets[0].initialLineup,setupDraft.savedTeamId);
-  if (team) match.savedTeamId = team.id;
+  if (team){match.savedTeamId = team.id;team.receptionScheme=!!match.receptionScheme;}
 }
 function savedTeamPanel() {
   const teams = savedTeams();
@@ -59,7 +59,7 @@ function handleSavedTeamAction(action) {
   if (action === 'saved-team-save') {
     prepareDraftLineup();
     const team = storeTeamTemplate(setupDraft.team,setupDraft.players,setupDraft.lineup,setupDraft.savedTeamId);
-    if (team) { setupDraft.savedTeamId=team.id;save();render();toast('Equipo guardado para próximos partidos.'); }
+    if (team) { team.receptionScheme=!!setupDraft.receptionScheme;setupDraft.savedTeamId=team.id;save();render();toast('Equipo guardado para próximos partidos.'); }
   }
   if (action === 'saved-team-new') {
     const draft = freshSetup();
@@ -69,7 +69,7 @@ function handleSavedTeamAction(action) {
   if (action === 'saved-team-from-match') {
     const match=activeMatch();if (!match) return true;
     const team=storeTeamTemplate(match.team,match.players,match.sets[0].initialLineup || match.sets[0].positions,match.savedTeamId);
-    if (team) { match.savedTeamId=team.id;save();render();toast('Equipo guardado para próximos partidos.'); }
+    if (team) { team.receptionScheme=!!match.receptionScheme;match.savedTeamId=team.id;save();render();toast('Equipo guardado para próximos partidos.'); }
   }
   return true;
 }

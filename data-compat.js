@@ -85,9 +85,11 @@
         if (!object(a)) { fail(ap,'Acción inválida.'); return; }
         if (a.schemaVersion !== undefined && ![1,2].includes(a.schemaVersion)) fail(ap+'.schemaVersion','Esquema de acción incompatible.');
         if (a.id !== undefined) { if (!id(a.id) || actionIds.has(a.id)) fail(ap+'.id','ID de acción inválido o duplicado.'); actionIds.add(a.id); }
+        if(a.side!==undefined&&!['us','them'].includes(a.side))fail(ap+'.side','Equipo de acción inválido.');
         if (!SKILLS.includes(a.skill)) fail(ap+'.skill','Fundamento desconocido.');
-        if (!(a.skill==='rival_attack'?rivals:players).has(a.playerId)) fail(ap+'.playerId','La acción pertenece a un jugador inexistente.');
-        if (a.participants !== undefined && (!Array.isArray(a.participants) || a.participants.some(p => !players.has(p)) || new Set(a.participants).size !== a.participants.length)) fail(ap+'.participants','Los participantes deben ser jugadores distintos del plantel.');
+        if (!(a.skill==='rival_attack'||a.side==='them'?rivals:players).has(a.playerId)) fail(ap+'.playerId','La acción pertenece a un jugador inexistente.');
+        if (a.participants !== undefined && (!Array.isArray(a.participants) || a.participants.some(p => !(a.side==='them'?rivals:players).has(p)) || new Set(a.participants).size !== a.participants.length)) fail(ap+'.participants','Los participantes deben ser jugadores distintos del plantel.');
+        if(a.metadata?.rallyFlow&&a.metadata.blockers!==undefined){const ids=a.metadata.blockers,opposite=a.side==='them'?players:rivals;if(!Array.isArray(ids)||ids.length>3||new Set(ids).size!==ids.length||ids.some(id=>!opposite.has(id)))fail(ap+'.metadata.blockers','Bloqueadores contrarios inválidos.');}
         if (typeof a.outcome !== 'string' && typeof a.outcomeId !== 'string') fail(ap+'.outcome','Falta el resultado de la acción.');
         if (a.outcomeId !== undefined && !RESULTS[a.skill]?.includes(a.outcomeId)) warn(ap+'.outcomeId','Resultado desconocido: se conserva sin interpretación estadística.');
         if (a.zone !== undefined && a.zone !== null && (!Number.isInteger(a.zone) || a.zone < 1 || a.zone > 6)) fail(ap+'.zone','Zona inválida.');
@@ -105,7 +107,7 @@
       value.matches.forEach((m,mi) => {
         const mp = 'matches['+mi+']';
         if (!object(m)) return;
-        if(m.rivalPlayers!==undefined){if(!Array.isArray(m.rivalPlayers))fail(mp+'.rivalPlayers','Plantel rival inválido.');else {identities(m.rivalPlayers,mp+'.rivalPlayers');const numbers=new Set();m.rivalPlayers.forEach(p=>{if(!object(p)||typeof p.number!=='string'||!/^\d{1,3}$/.test(p.number)||numbers.has(p.number)||!['outside','opposite','middle','setter','libero'].includes(p.position)||typeof p.name!=='string')fail(mp+'.rivalPlayers','Atacante rival inválido o repetido.');if(object(p))numbers.add(p.number);});}}
+        if(m.rivalPlayers!==undefined){if(!Array.isArray(m.rivalPlayers))fail(mp+'.rivalPlayers','Plantel rival inválido.');else {identities(m.rivalPlayers,mp+'.rivalPlayers');const numbers=new Set();m.rivalPlayers.forEach(p=>{if(!object(p)||typeof p.number!=='string'||(!p.provisional&&!/^\d{1,3}$/.test(p.number))||numbers.has(p.number)||!['','outside','opposite','middle','setter','libero'].includes(p.position??'')||typeof p.name!=='string')fail(mp+'.rivalPlayers','Atacante rival inválido o repetido.');if(object(p))numbers.add(p.number);});}}
         const playerIds = roster(m.players,mp+'.players',false);
         for (const field of ['team','opponent']) if (typeof m[field] !== 'string') fail(mp+'.'+field,'Falta el nombre del equipo.');
         if (typeof m.createdAt !== 'string' || !m.createdAt) fail(mp+'.createdAt','Falta la fecha de creación del partido.');
@@ -129,7 +131,8 @@
             s.changes.forEach((c,ci) => {
               if (!object(c)) return;
               const cp=sp+'.changes['+ci+']';
-              if (!playerIds.has(c.outgoing) || !playerIds.has(c.incoming)) fail(cp,'El cambio contiene un jugador inexistente.');
+              const changePlayers=c.side==='them'?new Set((m.rivalPlayers||[]).map(p=>p.id)):playerIds;
+              if (!changePlayers.has(c.outgoing) || !changePlayers.has(c.incoming)) fail(cp,'El cambio contiene un jugador inexistente.');
               if (c.before?.positions) positions(c.before.positions,cp+'.before.positions',playerIds);
               if (c.before?.libero) libero(c.before.libero,cp+'.before.libero',playerIds);
             });
@@ -236,6 +239,7 @@
     let winner=null;
     if ((skill === 'serve' && outcomeId === 'ace') || (skill === 'attack' && ['kill','use_block_out','tip_kill'].includes(outcomeId)) || (skill === 'block' && outcomeId === 'point')) winner='us';
     if ((skill === 'serve' && outcomeId === 'error') || (skill === 'attack' && ['error','blocked_point'].includes(outcomeId)) || (skill === 'block' && outcomeId === 'fault') || ['reception','defense','setting'].includes(skill) && outcomeId === 'direct_error') winner='them';
+    if(a.side==='them'&&skill!=='rival_attack'&&winner)winner=winner==='us'?'them':'us';
     if(skill==='rival_attack')winner=outcomeId==='kill'?'them':['error','blocked_point'].includes(outcomeId)?'us':null;
     if(skill==='rival_attack'&&a.metadata?.linkedOwnBlockActionId)winner=null;
     const quality = skill === 'reception' ? ({perfect:3,positive:2,poor:1,direct_error:0}[outcomeId] ?? null) : null;

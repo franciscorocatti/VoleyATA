@@ -114,15 +114,17 @@
   function receptionRelations(list){return relationshipSummary(list.filter(e=>e.action.skill==='reception').map(e=>({serverId:e.action.metadata?.serverContext?.playerId,receiverId:e.action.playerId,quality:qualityOf(e),zone:zoneOf(e.action,'origin'),status:statusOf(e.action,'origin'),serveRecorded:!!e.action.metadata?.serveActionId})));}
   function trendSummary(list,config){
     const zoneBuckets=()=>Object.fromEntries([1,2,3,4,5,6].map(z=>[z,trendBucket()]));
-    const attack={total:0,known:0,missing:0,directions:Object.fromEntries(['diagonal','paralela','olla','zona1','zona5'].map(d=>[d,trendBucket()])),origins:zones(),types:{},predominant:[]};
+    const attack={total:0,known:0,missing:0,directions:Object.fromEntries(['diagonal','paralela','olla','zona1','zona5','centro'].map(d=>[d,trendBucket()])),origins:zones(),types:{},predominant:[],predictions:{total:0,directions:{}}};
+    attack.heat=Object.fromEntries(['contacts','landings','estimates'].map(kind=>[kind,{total:0,zones:zoneBuckets()}]));
     const serve={total:0,known:0,unknown:0,knownDirection:0,directions:{paralela:trendBucket(),diagonal:trendBucket()},origins:zones(),destinations:zoneBuckets(),pairs:[],predominant:[],preferredZones:[]};
     const recovery=()=>({total:0,known:0,unknown:0,references:0,zones:zoneBuckets(),quality:{q0:0,q1:0,q2:0,q3:0},vsServers:[]});
     const reception=recovery(),defense=recovery(),coverage=recovery(),serveRelations=[];
     for(const e of list){const a=e.action,id=e.result.outcomeId,md=a.metadata||{};
       if(attackAttempt(e)){
+        const attackZone=zoneOf(a,'destination'),attackStatus=statusOf(a,'destination');if(attackZone&&spatialStatus(attackStatus)){const kind=attackStatus==='inferred'?'estimates':['kill','tip_kill','use_block_out'].includes(id)&&md.destinationSource==='observed'?'landings':'contacts';attack.heat[kind].total++;addZone(attack.heat[kind].zones[attackZone],e,attackStatus,null);}
         attack.total++;attack.origins[zoneOf(a,'origin')||'unknown']++;
         const type=md.attackType||'unknown';if(!attack.types[type])attack.types[type]=trendBucket();const t=attack.types[type];t.count++;t.outcomes[id]=(t.outcomes[id]||0)+1;
-        const b=attack.directions[md.attackDirection];if(b){attack.known++;b.count++;b.kills+=+['kill','tip_kill','use_block_out'].includes(id);b.errors+=+(id==='error'||id==='blocked_point'&&config.blockedPointIsError);b.continues+=+['continue','tip_continue','covered_block'].includes(id);b.outcomes[id]=(b.outcomes[id]||0)+1;}
+        const b=attack.directions[md.attackDirection];if(b&&md.directionSource==='predicted'){attack.predictions.total++;attack.predictions.directions[md.attackDirection]=(attack.predictions.directions[md.attackDirection]||0)+1;}else if(b){attack.known++;b.count++;b.kills+=+['kill','tip_kill','use_block_out'].includes(id);b.errors+=+(id==='error'||id==='blocked_point'&&config.blockedPointIsError);b.continues+=+['continue','tip_continue','covered_block'].includes(id);b.outcomes[id]=(b.outcomes[id]||0)+1;}
       }
       if(a.skill==='serve'){
         serve.total++;serve.origins[zoneOf(a,'origin')||'unknown']++;
@@ -140,6 +142,7 @@
     }
     function finalize(groups,total){for(const g of Object.values(groups)){g.percent=percent(g.count,total);g.efficiency=percent(g.kills-g.errors,g.count);}}
     function dominant(groups){const max=Math.max(0,...Object.values(groups).map(g=>g.count));return max?Object.keys(groups).filter(k=>groups[k].count===max):[];}
+    for(const group of Object.values(attack.heat))finalize(group.zones,group.total);
     attack.missing=attack.total-attack.known;finalize(attack.directions,attack.known);attack.predominant=dominant(attack.directions);
     serve.unknown=serve.total-serve.known;finalize(serve.directions,serve.knownDirection);finalize(serve.destinations,serve.known);serve.predominant=dominant(serve.directions);serve.preferredZones=dominant(serve.destinations);serve.pairs=relationshipSummary(serveRelations);
     for(const t of [reception,defense,coverage]){t.unknown=t.total-t.known;finalize(t.zones,t.known);}
@@ -148,6 +151,7 @@
   }
   function summarize(list,config) {
     const trends=trendSummary(list,config);
+    const connections=typeof VolleyLinks!=='undefined'?VolleyLinks.summarize(list):null;
     const coverages=list.filter(e=>e.action.skill==='defense'&&e.action.metadata?.defenseKind==='coverage');
     list=list.filter(e=>!coverages.includes(e));
     const count = (skill,id) => list.filter(e=>e.action.skill === skill && e.result.outcomeId === id).length;
@@ -183,6 +187,7 @@
     for(const bucket of Object.values(byRole))bucket.efficiency=percent(bucket.kills-bucket.errors,bucket.attempts);
     return {
       trends,
+      connections,
       coverage:{total:coverages.length,perfect:coverages.filter(e=>e.result.outcomeId==='perfect').length,positive:coverages.filter(e=>e.result.outcomeId==='positive').length,limited:coverages.filter(e=>e.result.outcomeId==='limited').length,directErrors:coverages.filter(e=>e.result.outcomeId==='direct_error').length},
       attack:{total:attackEntries.length,attempts:attackEntries.length,kills:K,conventionalKills,unspecifiedKills,useBlockOutKills,tipKills,tipContinues:ac('tip_continue'),errors:E,continues:ac('continue')+ac('tip_continue'),coveredBlocks:ac('covered_block'),blockedPoints:blocked,ambiguousBlocks:ac('ambiguous_block'),efficiency:percent(K-E,attackEntries.length),killPct:percent(K,attackEntries.length),origin,destination,phase,byRole},
       serve:{total:total('serve'),aces:count('serve','ace'),positive:count('serve','positive'),neutral:count('serve','neutral'),errors:count('serve','error'),acePct:percent(count('serve','ace'),total('serve')),errorPct:percent(count('serve','error'),total('serve'))},

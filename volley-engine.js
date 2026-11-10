@@ -35,6 +35,7 @@ const VolleyRally = (() => {
     return {scheme:team==='us'&&!!m.receptionScheme,positions:[...ids],roles:Object.fromEntries(ids.map(id=>[id,playerPosition(roster(m,team).find(p=>p.id===id))]))};
   }
   function receptionSuggestion(context,id){
+    if(context?.template?.tactical&&Array.isArray(context.template.ids)){const zone=context.template.ids.indexOf(id)+1;return {zone:zone||null,source:zone?'tactical-template':'unknown'};}
     const ids=context?.positions||[],pos=ids.indexOf(id)+1;
     if(context?.scheme){
       const front=ids.map((id,i)=>({id,pos:i+1})).filter(x=>[2,3,4].includes(x.pos)&&context.roles[x.id]==='outside');
@@ -47,7 +48,7 @@ const VolleyRally = (() => {
   }
   function receptionZone(m,set,team,id){return receptionSuggestion(receptionContext(m,set,team),id);}
   function defenseSuggestion(context,id){
-    const zone=context?.tactical?context.ids?.indexOf(id)+1:0;
+    const zone=context?.tactical&&Array.isArray(context.ids)?context.ids.indexOf(id)+1:0;
     if(![1,2,3,4,5,6].includes(zone))return {zone:null,source:'unknown',tacticalContext:null};
     return {zone,source:'tactical-reference',tacticalContext:{rotation:(context.positions||[]).indexOf(id)+1||null,zone,source:context.source,tactical:true}};
   }
@@ -62,13 +63,13 @@ const VolleyRally = (() => {
     const from={1:1,6:0,5:-1}[origin],to={1:-1,2:-1,3:0,4:1,5:1,6:0}[destination];
     return from==null||to==null||from===0||to===0?null:from===to?'paralela':'diagonal';
   }
-  const spatial=source=>['observed','reception-scheme','role-zone','tactical-role','serve-default'].includes(source);
+  const spatial=source=>['observed','reception-scheme','role-zone','tactical-role','tactical-template','serve-default'].includes(source);
   function zoneStatus(a,kind='origin'){
     const value=kind==='origin'?a?.originZone:a?.destinationZone;if(![1,2,3,4,5,6].includes(value))return 'unknown';
     let source=a.metadata?.[kind+'Source'];
     if(['linked-reception','linked-defense'].includes(source))source=a.metadata?.destinationEvidence;
     if(source==='observed')return 'confirmed';
-    if(['reception-scheme','role-zone','tactical-role','tactical-reference','serve-default'].includes(source))return 'inferred';
+    if(['reception-scheme','role-zone','tactical-role','tactical-reference','tactical-template','serve-default'].includes(source))return 'inferred';
     if(source==='rotation-reference')return 'reference';
     return source==='unknown'?'unknown':'recorded';
   }
@@ -76,7 +77,7 @@ const VolleyRally = (() => {
     for(let i=0;i<actions.length;i++){
       const a=actions[i];if(!a.metadata?.rallyFlow)continue;
       const md=a.metadata;a.order=i+1;md.previousActionId=actions[i-1]?.id||null;
-      for(const key of ['relatedActionId','relatedAttackOutcome','serveActionId','receiverIdLinked','receptionActionId','defenseActionId','defenderId','defense','reception','setterId','attackPhase','coverageOf'])delete md[key];
+      for(const key of ['relatedActionId','relatedAttackOutcome','serveActionId','receiverIdLinked','receptionActionId','defenseActionId','defenderId','defense','reception','setterId','attackPhase','coverageOf','incomingAttack','linkedAttack','receptionQuality','counterattack'])delete md[key];
       if(md.destinationSource==='linked-reception'||md.destinationSource==='linked-defense'){a.destinationZone=null;md.destinationSource='unknown';delete md.destinationEvidence;}
       if(md.directionSource==='derived'){md.attackDirection=null;md.directionSource='unknown';}
       if(md.serveDirectionSource!=='observed'){md.serveDirection=null;md.serveDirectionSource='unknown';}
@@ -106,7 +107,7 @@ const VolleyRally = (() => {
         }
       }
       if(a.skill==='attack'){
-        if(prev?.skill==='setting'&&side(prev)===side(a))md.setterId=prev.playerId;
+        if(prev?.skill==='setting'&&side(prev)===side(a)){md.setterId=prev.playerId;prev.metadata.linkedAttack={actionId:a.id,playerId:a.playerId,originZone:a.originZone,outcomeId:a.outcomeId};}
         const first=actions.slice(0,i).reverse().find(x=>side(x)===side(a)&&['reception','defense','attack'].includes(skill(x)));
         md.attackPhase=first?.skill==='reception'?'reception':first?.skill==='defense'?(first.metadata?.defenseKind==='coverage'?'coverage':'counterattack'):null;
       }
@@ -122,6 +123,13 @@ const VolleyRally = (() => {
       }
       md.originStatus=zoneStatus(a,'origin');md.destinationStatus=zoneStatus(a,'destination');
       a.zone=['serve','attack'].includes(a.skill)?a.destinationZone:a.originZone;
+    }
+    for(let i=0;i<actions.length;i++){
+      const a=actions[i],md=a.metadata;if(!md?.rallyFlow)continue;
+      const attack=actions.find(x=>x.id===md.relatedActionId&&skill(x)==='attack');
+      if(attack)md.incomingAttack={actionId:attack.id,playerId:attack.playerId,originZone:attack.originZone,direction:attack.metadata?.attackDirection,directionSource:attack.metadata?.directionSource,outcomeId:attack.outcomeId};
+      if(a.skill==='defense'){const next=actions.slice(i+1).find(x=>skill(x)==='attack');if(next&&side(next)===side(a))md.counterattack={actionId:next.id,playerId:next.playerId,outcomeId:next.outcomeId};}
+      if(a.skill==='setting'){const preceding=actions.slice(0,i).reverse().find(x=>side(x)===side(a)&&['reception','defense','attack'].includes(skill(x)));if(preceding?.skill==='reception'){md.receptionActionId=preceding.id;md.receptionQuality=preceding.metadata?.quality??null;}}
     }
     return actions;
   }
@@ -186,6 +194,7 @@ const VolleyCourt = (() => {
   }
   function layout(m,s,side='us'){
     const ids=VolleyRally.positions(s,side),roster=VolleyRally.roster(m,side);
+    const template=typeof VolleyTactics!=='undefined'&&m.integralVersion?VolleyTactics.layout(m,s,side):null;if(template)return template;
     const fallback=()=>({ids:[...ids],source:'rotation-reference',tactical:false});
     if(!enabled(m,s)||ids.length!==6||new Set(ids).size!==6)return fallback();
     const override=s.tacticalOverrides?.[side];
@@ -206,7 +215,8 @@ const VolleyCourt = (() => {
     if(!enabled(m,s)||![1,2,3,4,5,6].includes(zone))return false;
     const view=layout(m,s,side),from=view.ids.indexOf(id);if(from<0)return false;
     [view.ids[from],view.ids[zone-1]]=[view.ids[zone-1],view.ids[from]];
-    s.tacticalOverrides ||= {};s.tacticalOverrides[side]={context:tacticalKey(s,side),zones:view.ids};return true;
+    if(m.integralVersion&&m.tacticalProfiles?.[side]){const phase=VolleyTactics.phase(m,s,side);s.phaseOverrides ||= {};s.phaseOverrides[side] ||= {};s.phaseOverrides[side][phase]={context:tacticalKey(s,side),zones:view.ids};}
+    else {s.tacticalOverrides ||= {};s.tacticalOverrides[side]={context:tacticalKey(s,side),zones:view.ids};}return true;
   }
   return {enabled,boundary,tacticalKey,manualLibero,sync,layout,location,move};
 })();
@@ -229,14 +239,16 @@ const VolleyEngine = (() => {
     const repetition=set.training?.type==='repetitions';
     const player=match.players.find(p=>p.id===input.playerId);
     if (!player) return {error:'Elegí un jugador antes de registrar la acción.'};
-    if (!onCourt(set).includes(player.id)) return {error:'Ese jugador no está en cancha. Registrá primero el cambio o elegí un jugador en cancha.'};
+    if (!onCourt(set).includes(player.id)&&!(team==='them'&&input.skill==='attack'&&input.metadata?.anonymous&&player.anonymous&&player.provisional)) return {error:'Ese jugador no está en cancha. Registrá primero el cambio o elegí un jugador en cancha.'};
     if(!repetition&&player.isLibero&&['serve','block'].includes(input.skill))return {error:'Con el criterio FIVB, el líbero no puede sacar ni bloquear. Revisá el jugador seleccionado.'};
     if (!repetition&&input.skill==='serve'&&(set.serve!=='us'||actions.length)) return {error:'El saque solo se registra al comenzar un rally con servicio nuestro.'};
     if (!repetition&&input.skill==='reception'&&(set.serve!=='them'||actions.some(a=>!(a.skill==='serve'&&VolleyRally.side(a)!==team)&&['serve','reception','attack','defense','rival_attack'].includes(a.skill)))) return {error:'La recepción corresponde al primer contacto de un saque rival. Para una pelota en juego usá Defensa.'};
     const participants=[...new Set([player.id,...(input.skill==='block'?(input.participants||[]):[])])];
-    if (participants.length>3||participants.some(p=>!onCourt(set).includes(p)||!match.players.some(x=>x.id===p))) return {error:'Elegí hasta tres bloqueadores que estén en cancha.'};
+    if (input.skill==='block'&&(participants.length>3||participants.some(p=>!onCourt(set).includes(p)||!match.players.some(x=>x.id===p)))) return {error:'Elegí hasta tres bloqueadores que estén en cancha.'};
     if(!repetition&&input.skill==='block'&&participants.some(id=>match.players.find(p=>p.id===id)?.isLibero))return {error:'El líbero no puede participar del bloqueo.'};
-    const metadata={...(input.metadata||{})};
+    if(!repetition&&originalMatch.integralVersion&&input.skill==='block'&&participants.some(id=>![2,3,4].includes(onCourt(set).indexOf(id)+1)))return {error:'El bloqueo corresponde sólo a jugadores delanteros de la rotación oficial.'};
+    const metadata={...(input.metadata||{})};if(!player.anonymous)delete metadata.anonymous;
+    if(input.side){metadata.officialPosition=onCourt(set).indexOf(player.id)+1||null;metadata.rotation=team==='us'?originalSet.rotation:originalSet.opponentLineup?.rotation||null;}
     if(metadata.rallyFlow&&input.skill==='attack'&&['blocked_point','covered_block','use_block_out'].includes(definition.id)){const ids=metadata.blockers||[],opponents=VolleyRally.roster(originalMatch,VolleyRally.other(team)),court=VolleyRally.positions(originalSet,VolleyRally.other(team));if(!Array.isArray(ids)||new Set(ids).size!==ids.length||ids.length>3||ids.some(id=>!court.includes(id)||opponents.find(p=>p.id===id)?.isLibero||![2,3,4].includes(court.indexOf(id)+1)))return {error:'Elegí hasta tres bloqueadores delanteros del equipo contrario.'};}
     if(input.skill==='attack') {
       if(typeof playerPosition==='function')metadata.playerPosition=playerPosition(player);
@@ -269,7 +281,7 @@ const VolleyEngine = (() => {
       metadata.attackRoleSource=manual?'manual':position.source;
       metadata.computedAttackRole=position.role;
     }
-    if(input.side){action.side=team;action.rotationalPosition=onCourt(set).indexOf(player.id)+1;action.metadata.playerSnapshot={id:player.id,number:player.number,name:player.name,position:typeof playerPosition==='function'?playerPosition(player):null,provisional:!!player.provisional};}
+    if(input.side){action.side=team;action.rotationalPosition=onCourt(set).indexOf(player.id)+1||null;action.metadata.playerSnapshot={id:player.id,number:player.number,name:player.name,position:typeof playerPosition==='function'?playerPosition(player):null,provisional:!!player.provisional};}
     return {action,terminalWinner:repetition?null:definition.winner?(team==='them'?VolleyRally.other(definition.winner):definition.winner):null};
   }
   function terminalWinner(actions) {
@@ -304,7 +316,7 @@ const VolleyEngine = (() => {
       if(action.skill==='block'&&(action.participants||[]).some(id=>!onCourt(set).includes(id)))return {error:'Hay un bloqueador pendiente fuera de cancha.'};
     }
     const before={score:clone(set.score),serve:set.serve,rotation:set.rotation,positions:[...set.positions],libero:clone(set.libero||null),
-      opponentLineup:clone(set.opponentLineup||null),changes:clone(set.changes||[]),liberoManual:clone(set.liberoManual||{}),tacticalOverrides:clone(set.tacticalOverrides||{}),courtPolicy:{enabled:match.courtAutomation===1,liberoAuto:clone(match.liberoAuto||{}),liberoPreferred:clone(match.liberoPreferred||{})}};
+      opponentLineup:clone(set.opponentLineup||null),changes:clone(set.changes||[]),liberoManual:clone(set.liberoManual||{}),tacticalOverrides:clone(set.tacticalOverrides||{}),phaseOverrides:clone(set.phaseOverrides||{}),courtPolicy:{enabled:match.courtAutomation===1,liberoAuto:clone(match.liberoAuto||{}),liberoPreferred:clone(match.liberoPreferred||{})}};
     const rally={id:options.id||id(),schemaVersion:2,matchId:match.id,setId:set.id,number:set.rallies.length+1,status:'closed',
       timestamp:new Date().toISOString(),winner,serveBefore:before.serve,rotation:before.rotation,positions:[...before.positions],
       scoreBefore:clone(before.score),liberoBefore:clone(before.libero),opponentBefore:clone(before.opponentLineup),
@@ -335,6 +347,7 @@ const VolleyEngine = (() => {
     if (rally.before||'opponentBefore' in rally) set.opponentLineup=clone(rally.before?.opponentLineup||rally.opponentBefore||null);
     if (rally.before?.changes) set.changes=clone(rally.before.changes);else if (rally.changeCount!=null) set.changes=(set.changes||[]).slice(0,rally.changeCount);
     if(rally.before?.liberoManual)set.liberoManual=clone(rally.before.liberoManual);else delete set.liberoManual;
+    if(rally.before?.phaseOverrides)set.phaseOverrides=clone(rally.before.phaseOverrides);else delete set.phaseOverrides;
     if(rally.before?.tacticalOverrides)set.tacticalOverrides=clone(rally.before.tacticalOverrides);else delete set.tacticalOverrides;
     set.finished=false;set.winner=null;
     return {rally,actions:clone(rally.actions||[])};
@@ -351,11 +364,22 @@ const VolleyEngine = (() => {
       if(action.skill==='defense'&&input.playerId!==action.playerId&&input.originZone===action.originZone&&input.metadata.originSource!=='observed'){
         const guess=VolleyRally.defenseSuggestion(input.metadata.defenseContext,input.playerId);input.originZone=guess.zone;input.metadata.originSource=guess.source;input.metadata.tacticalContext=guess.tacticalContext;
       }
-      const created=createAction(input,{match,set:context,actions:updated.slice(0,index),mode:action.mode});
+      let created;
+      if(action.skill==='rival_attack'){
+        const definition=VolleyCatalog.find('rival_attack',input.outcomeId),actor=(match.rivalPlayers||[]).find(p=>p.id===input.playerId);
+        if(!definition||!actor)return {error:'Resultado o jugador rival histórico inválido.'};
+        const metadata={...input.metadata,attackType:action.metadata?.attackType};
+        created={action:{...action,playerId:actor.id,outcomeId:definition.id,outcome:definition.legacy,originZone:zone(input.originZone),destinationZone:zone(input.destinationZone),zone:zone(input.destinationZone),metadata}};
+      }else created=createAction(input,{match,set:context,actions:updated.slice(0,index),mode:action.mode});
       if(created.error)return created;
+      if(input.playerId===action.playerId){if(action.metadata?.playerSnapshot)created.action.metadata.playerSnapshot=clone(action.metadata.playerSnapshot);if(action.metadata?.playerPosition)created.action.metadata.playerPosition=action.metadata.playerPosition;}
       updated[index]={...created.action,timestamp:action.timestamp};
     }
-    VolleyRally.relink(updated);
+    for(const legacy of updated.filter(a=>a.skill==='rival_attack'&&a.metadata?.linkedOwnBlockActionId)){
+      const expected=legacy.outcomeId==='blocked_point'?'point':legacy.outcomeId==='covered_block'?'positive_touch':null;
+      if(!expected||!updated.some(b=>b.id===legacy.metadata.linkedOwnBlockActionId&&b.skill==='block'&&b.outcomeId===expected))delete legacy.metadata.linkedOwnBlockActionId;
+    }
+    VolleyRally.relink(updated);if(typeof VolleyPrediction!=='undefined')VolleyPrediction.apply(match,updated);
     const winner=terminalWinner(updated)||rally.winner;
     if(winner===rally.winner){
       const checkSet={...clone(context),rallies:[],score:clone(rally.scoreBefore),rotation:rally.rotation};

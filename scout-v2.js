@@ -14,7 +14,7 @@ function renderFlowHistory(m){
   const list=m.sets.flatMap(s=>s.rallies.map(r=>({s,r})));
   const editing=flowHistory&&list.find(x=>x.s.id===flowHistory.setId&&x.r.id===flowHistory.rallyId),a=editing?.r.actions.find(a=>a.id===flowHistory.actionId);
   const zoneSelect=(id,value)=>`<select id="${id}"><option value="">Sin zona</option>${[1,2,3,4,5,6].map(z=>`<option value="${z}" ${z===value?'selected':''}>Z${z}</option>`).join('')}</select>`;
-  return `<details class="card flow-history" ${a?'open':''}><summary>Revisar / corregir acciones guardadas · ${list.length} rallies</summary>${a?`<section class="inline-block-confirm"><h3>Editar acción · Set ${editing.s.number} · punto ${editing.r.number}</h3><p>${esc(scoutActionLabel(a))} · ${esc(flowName(m,a.playerId,VolleyRally.side(a)))}</p><div class="grid-2"><label>Jugador<select id="flow-history-player">${teamOptions(VolleyRally.roster(m,VolleyRally.side(a)),a.playerId)}</select></label><label>Resultado<select id="flow-history-result">${VolleyCatalog.definitions[a.skill]?.outcomes.map(o=>`<option value="${o.id}" ${o.id===a.outcomeId?'selected':''}>${o.label}</option>`).join('')}</select></label><label>Origen real${zoneSelect('flow-history-origin',a.originZone)}</label><label>Destino real${zoneSelect('flow-history-destination',a.destinationZone)}</label><label>Dirección<select id="flow-history-direction"><option value="">Calcular si hay datos</option>${Object.entries(a.skill==='serve'?{paralela:'Paralela',diagonal:'Diagonal'}:flowDirectionLabels).map(([d,l])=>`<option value="${d}" ${(a.skill==='serve'?a.metadata?.serveDirectionSource==='observed'&&a.metadata?.serveDirection===d:a.metadata?.directionSource!=='derived'&&a.metadata?.attackDirection===d)?'selected':''}>${l}</option>`).join('')}</select></label><label>Técnica<select id="flow-history-type">${[['conventional','Remate'],['tip','Toque / colocada'],['use_block_out','Use / block-out']].map(([v,l])=>`<option value="${v}" ${a.metadata?.attackType===v?'selected':''}>${l}</option>`).join('')}</select></label><label>Intervención defensiva<select id="flow-history-coverage"><option value="defense">Defensa convencional</option><option value="coverage" ${a.metadata?.defenseKind==='coverage'?'selected':''}>Cobertura</option></select></label></div>${a.skill==='reception'&&VolleyRally.side(a)==='us'&&a.metadata?.receptionContext?`<label class="row"><input type="checkbox" id="flow-history-scheme" ${a.metadata.receptionContext.scheme?'checked':''}>Usar esquema propio para esta recepción</label>`:''}${renderFlowHistoryBlockers(m,editing.r,a)}<p class="hinttext">Las zonas sólo se confirman como observadas si las cambiás. Cambiar el ganador recalcula marcador y rotaciones; si contradice una acción posterior, la corrección se rechaza sin modificar los datos.</p><button class="btn btn-primary" data-action="flow-history-save">Guardar corrección</button><button class="btn btn-danger" data-action="flow-history-remove">Eliminar esta acción</button><button class="btn" data-action="flow-history-cancel">Cancelar</button></section>`:''}<div class="history">${list.slice().reverse().map(({s,r})=>`<details><summary>Set ${s.number} · ${r.scoreBefore.us+(r.winner==='us'?1:0)}–${r.scoreBefore.them+(r.winner==='them'?1:0)} · ${esc(r.winner==='us'?m.team:m.opponent)}</summary><ol>${r.actions.map(a=>`<li>${esc(flowName(m,a.playerId,VolleyRally.side(a)))} · ${esc(scoutActionLabel(a))}${a.skill==='rival_attack'?'':` <button class="btn btn-small" data-action="flow-history-edit" data-set="${esc(s.id)}" data-rally="${esc(r.id)}" data-id="${esc(a.id)}">Corregir</button>`}</li>`).join('')}</ol></details>`).join('')}</div></details>`;
+  return `<details class="card flow-history" ${a?'open':''}><summary>Revisar / corregir acciones guardadas · ${list.length} rallies</summary>${a?`<section class="inline-block-confirm"><h3>Editar acción · Set ${editing.s.number} · punto ${editing.r.number}</h3><p>${esc(scoutActionLabel(a))} · ${esc(flowName(m,a.playerId,VolleyRally.side(a)))}</p><div class="grid-2"><label>Jugador<select id="flow-history-player">${teamOptions(VolleyRally.roster(m,VolleyRally.side(a)),a.playerId)}</select></label><label>Resultado<select id="flow-history-result">${(a.skill==='rival_attack'?Object.entries(RIVAL_RESULTS).map(([id,o])=>({id,label:o.label})):VolleyCatalog.definitions[a.skill]?.outcomes||[]).map(o=>`<option value="${o.id}" ${o.id===a.outcomeId?'selected':''}>${o.label}</option>`).join('')}</select></label><label>Origen real${zoneSelect('flow-history-origin',a.originZone)}</label><label>Destino real${zoneSelect('flow-history-destination',a.destinationZone)}</label><label>Dirección<select id="flow-history-direction"><option value="">Calcular si hay datos</option>${Object.entries(a.skill==='serve'?{paralela:'Paralela',diagonal:'Diagonal'}:flowDirectionLabels).map(([d,l])=>`<option value="${d}" ${(a.skill==='serve'?a.metadata?.serveDirectionSource==='observed'&&a.metadata?.serveDirection===d:a.metadata?.directionSource==='observed'&&a.metadata?.attackDirection===d)?'selected':''}>${l}</option>`).join('')}</select></label><label>Técnica<select id="flow-history-type" ${a.skill==='rival_attack'?'disabled':''}>${[['conventional','Remate'],['tip','Toque / colocada'],['use_block_out','Use / block-out']].map(([v,l])=>`<option value="${v}" ${a.metadata?.attackType===v?'selected':''}>${l}</option>`).join('')}</select></label><label>Intervención defensiva<select id="flow-history-coverage"><option value="defense">Defensa convencional</option><option value="coverage" ${a.metadata?.defenseKind==='coverage'?'selected':''}>Cobertura</option></select></label></div>${a.skill==='reception'&&VolleyRally.side(a)==='us'&&a.metadata?.receptionContext?`<label class="row"><input type="checkbox" id="flow-history-scheme" ${a.metadata.receptionContext.scheme?'checked':''}>Usar esquema propio para esta recepción</label>`:''}${renderFlowHistoryBlockers(m,editing.r,a)}<p class="hinttext">Las zonas sólo se confirman como observadas si las cambiás. Cambiar el ganador recalcula marcador y rotaciones; si contradice una acción posterior, la corrección se rechaza sin modificar los datos.</p><button class="btn btn-primary" data-action="flow-history-save">Guardar corrección</button><button class="btn btn-danger" data-action="flow-history-remove">Eliminar esta acción</button><button class="btn" data-action="flow-history-cancel">Cancelar</button></section>`:''}<div class="history">${list.slice().reverse().map(({s,r})=>`<details><summary>Set ${s.number} · ${r.scoreBefore.us+(r.winner==='us'?1:0)}–${r.scoreBefore.them+(r.winner==='them'?1:0)} · ${esc(r.winner==='us'?m.team:m.opponent)}</summary><ol>${r.actions.map(a=>`<li>${esc(flowName(m,a.playerId,VolleyRally.side(a)))} · ${esc(scoutActionLabel(a))}${` <button class="btn btn-small" data-action="flow-history-edit" data-set="${esc(s.id)}" data-rally="${esc(r.id)}" data-id="${esc(a.id)}">Corregir</button>`}</li>`).join('')}</ol></details>`).join('')}</div></details>`;
 }
 function tacticalInputSuggestion(){
   const m=activeMatch(),s=activeSet();
@@ -44,12 +44,12 @@ function prepareFlowInputs(){
     originZone=guess.zone;flowOriginSource=guess.source;return;
   }
   if(selectedSkill==='serve'){originZone=1;flowOriginSource='serve-default';}
-  if(selectedSkill==='reception'){const guess=VolleyRally.receptionZone(activeMatch(),activeSet(),activeSide,selectedPlayerId);originZone=guess.zone;flowOriginSource=guess.source;}
+  if(selectedSkill==='reception'){const template=typeof VolleyTactics!=='undefined'&&activeMatch().integralVersion?VolleyTactics.layout(activeMatch(),activeSet(),activeSide):null;const guess=template?{zone:template.ids.indexOf(selectedPlayerId)+1||null,source:'tactical-template'}:VolleyRally.receptionZone(activeMatch(),activeSet(),activeSide,selectedPlayerId);originZone=guess.zone;flowOriginSource=guess.source;}
   if(selectedSkill==='attack'){originZone=defaultAttackOrigin();flowOriginSource=originZone?'role-zone':'unknown';}
   refreshTacticalInput();
 }
 function setFlowPhase(phase){
-  activeSide=phase.side;selectedSkill=phase.skill;flowCoverage=!!phase.coverage;
+  activeSide=phase.side;selectedSkill=phase.skill;flowCoverage=!!phase.coverage;if(typeof VolleyTactics!=='undefined')VolleyTactics.setPhase(activeMatch(),activeSet(),activeSide,selectedSkill);
   selectedPlayerId=selectedSkill==='serve'?VolleyRally.positions(activeSet(),activeSide)[0]||null:null;
   resetActionInputs();prepareFlowInputs();
 }
@@ -59,15 +59,16 @@ function beginRallyFlow(){
   const last=pending.at(-1),phase=VolleyRally.next(last);if(phase)setFlowPhase(phase);else if(last?.metadata?.rallyFlow){setFlowPhase({side:VolleyRally.side(last),skill:last.skill});selectedPlayerId=last.playerId;}
 }
 function flowMetadata(){
-  return {rallyFlow:2,actionSide:activeSide,matchId:activeMatch().id,setId:activeSet().id,rallyId:openRallyId,
-    originSource:flowOriginSource,destinationSource:flowDestinationSource,
+  return {rallyFlow:2,interpretationVersion:activeMatch().integralVersion?3:2,actionSide:activeSide,matchId:activeMatch().id,setId:activeSet().id,rallyId:openRallyId,
+    originSource:flowOriginSource,destinationSource:flowDestinationSource,phase:typeof VolleyTactics!=='undefined'?VolleyTactics.phase(activeMatch(),activeSet(),activeSide):null,
     serveDirection:serveDirectionManual,serveDirectionSource:serveDirectionManual?'observed':'derived',
-    receptionContext:selectedSkill==='reception'?VolleyRally.receptionContext(activeMatch(),activeSet(),activeSide):null,
+    receptionContext:selectedSkill==='reception'?{...VolleyRally.receptionContext(activeMatch(),activeSet(),activeSide),template:typeof VolleyTactics!=='undefined'?VolleyTactics.layout(activeMatch(),activeSet(),activeSide):null}:null,
     defenseContext:selectedSkill==='defense'?{...VolleyCourt.layout(activeMatch(),activeSet(),activeSide),positions:[...VolleyRally.positions(activeSet(),activeSide)]}:null,
     rotationServerContext:selectedSkill==='reception'?{side:activeSet().serve,playerId:VolleyRally.positions(activeSet(),activeSet().serve)[0]||null,source:'rotation'}:null,
     tacticalContext:VolleyCourt.enabled(activeMatch(),activeSet())?VolleyCourt.location(activeMatch(),activeSet(),activeSide,selectedPlayerId):null,
     directionSource:attackDirection?'observed':'unknown',attackDirection,attackType,
     defenseKind:selectedSkill==='defense'?(flowCoverage?'coverage':'defense'):null,
+    blockerSuggestion:selectedSkill==='attack'?VolleyIntegral.blockCandidates(activeMatch(),activeSet(),activeSide,originZone).map(p=>p.id):[],
     blockers:flowBlockers.slice(),blockerSide:VolleyRally.other(activeSide),
     settingTarget:settingTarget||null,receiverId:receiverId||null,
     serverContext:selectedSkill==='reception'?{side:activeSet().serve,playerId:VolleyRally.positions(activeSet(),activeSet().serve)[0]||null,source:'rotation'}:null};
@@ -88,7 +89,7 @@ function addFlowAction(result,input={}){
   if(created.error){toast(created.error);return false;}
   if(created.terminalWinner&&index!==null&&index!==pending.length-1){toast('La acción terminal debe quedar al final. Quitá o corregí primero las posteriores.');return false;}
   if(index===null)pending.push(created.action);else pending[index]=created.action;
-  VolleyRally.relink(pending);lastActionTap=now;resetActionInputs();awaitingBlockerIndex=null;earlyPhasesExpanded=false;
+  VolleyRally.relink(pending);if(typeof VolleyPrediction!=='undefined')VolleyPrediction.apply(activeMatch(),pending);lastActionTap=now;resetActionInputs();awaitingBlockerIndex=null;earlyPhasesExpanded=false;
   if(created.action.outcomeId==='blocked_point'&&autoClosePoints){awaitingBlockerIndex=index??pending.length-1;save();render();return true;}
   if(created.terminalWinner&&autoClosePoints)return finishRally(created.terminalWinner,{automatic:true});
   beginRallyFlow();save();render();return true;
@@ -103,16 +104,17 @@ function renderFlowPlayers(m){
   }).join('')}</div>`;
 }
 function renderFlowZones(){
-  const sourceLabel={observed:'observada',unknown:'sin dato','rotation-reference':'referencia de rotación; ubicación real desconocida','reception-scheme':'sugerida por esquema','role-zone':'sugerida por puesto','serve-default':'origen 1 predeterminado','tactical-role':'sugerida por distribución táctica','tactical-reference':'referencia táctica; zona exacta sin confirmar'};
+  const sourceLabel={observed:'observada',unknown:'sin dato','rotation-reference':'referencia de rotación; ubicación real desconocida','reception-scheme':'sugerida por esquema','role-zone':'sugerida por puesto','tactical-template':'sugerida por formación táctica','serve-default':'origen 1 predeterminado','tactical-role':'sugerida por distribución táctica','tactical-reference':'referencia táctica; zona exacta sin confirmar'};
   return `${selectedSkill==='serve'?`<strong>Dirección del saque</strong><div class="attack-fast">${[['','Automática'],['paralela','Paralela'],['diagonal','Diagonal']].map(([d,l])=>`<button class="btn ${serveDirectionManual===(d||null)?'btn-primary':''}" data-action="flow-serve-direction" data-direction="${d}">${l}</button>`).join('')}</div><strong>Origen del saque</strong><div class="attack-fast">${[1,6,5].map(z=>`<button class="btn ${originZone===z?'btn-primary':''}" data-action="flow-origin" data-zone="${z}">Zona ${z}</button>`).join('')}</div>`:''}${selectedSkill==='defense'?`<button class="btn" data-action="flow-coverage" aria-pressed="${flowCoverage}">${flowCoverage?'COBERTURA · bloqueo propio recuperado':'DEFENSA · ataque contrario'}</button>`:''}<p class="hinttext">Origen ${originZone||'—'} · ${sourceLabel[flowOriginSource]||flowOriginSource}</p><details class="v2-extra" ${selectedSkill==='defense'?'open':''}><summary>Corregir zonas de esta acción</summary>${renderZoneGrid('origin','Zona real de intervención',originZone)}${['serve','attack','setting'].includes(selectedSkill)?renderZoneGrid('destination','Destino · opcional',destinationZone):''}</details>`;
 }
 function renderFlowBlockPicker(m,action,index){
-  const side=action?VolleyRally.other(VolleyRally.side(action)):VolleyRally.other(activeSide),ids=VolleyRally.positions(activeSet(),side),origin=action?.originZone??originZone,preferred={4:2,3:3,2:4}[origin],selected=action?.metadata?.blockers||flowBlockers,layout=VolleyCourt.layout(m,activeSet(),side),preferredId=(layout.tactical?layout.ids:ids)[preferred-1];
-  return `<fieldset><legend>Bloqueadores ${side==='us'?'propios':'rivales'} · hasta tres</legend><p class="hinttext">${preferred?'Sugerencia por enfrentamiento: P'+preferred+'. Confirmá al participante observado.':'Sin posición suficiente para sugerir.'} Una sugerencia sola no atribuye estadísticas individuales.</p><div class="attack-fast">${[2,3,4].map(pos=>{const p=flowPlayer(m,ids[pos-1],side);if(!p||p.isLibero)return '';return `<button class="btn ${selected.includes(p.id)?'btn-primary':p.id===preferredId?'block-suggested':''}" data-action="flow-blocker" data-index="${index}" data-id="${esc(p.id)}" aria-pressed="${selected.includes(p.id)}">${esc(flowName(m,p.id,side))} · P${pos}${layout.tactical?' · Z'+(layout.ids.indexOf(p.id)+1)+' táctica':''}${p.id===preferredId?' · sugerido':''}</button>`;}).join('')}<button class="btn" data-action="flow-blocker-clear" data-index="${index}">Sin identificar</button></div></fieldset>`;
+  const candidates=m.integralVersion?VolleyIntegral.blockCandidates(m,activeSet(),action?VolleyRally.side(action):activeSide,action?.originZone??originZone):[];
+  const side=action?VolleyRally.other(VolleyRally.side(action)):VolleyRally.other(activeSide),ids=VolleyRally.positions(activeSet(),side),origin=action?.originZone??originZone,preferred={4:2,5:2,3:3,6:3,2:4,1:4}[origin],selected=action?.metadata?.blockers||flowBlockers,layout=VolleyCourt.layout(m,activeSet(),side),preferredId=candidates[0]?.id||(layout.tactical?layout.ids:ids)[preferred-1];
+  return `<fieldset><legend>Bloqueadores ${side==='us'?'propios':'rivales'} · hasta tres</legend><p class="hinttext">${preferred?'Sugerencia por enfrentamiento: Z'+preferred+'. Confirmá al participante observado.':'Sin posición suficiente para sugerir.'} Una sugerencia sola no atribuye estadísticas individuales.</p><div class="attack-fast">${[2,3,4].map(pos=>{const p=flowPlayer(m,ids[pos-1],side);if(!p||p.isLibero)return '';return `<button class="btn ${selected.includes(p.id)?'btn-primary':p.id===preferredId?'block-suggested':''}" data-action="flow-blocker" data-index="${index}" data-id="${esc(p.id)}" aria-pressed="${selected.includes(p.id)}">${esc(flowName(m,p.id,side))} · P${pos}${layout.tactical?' · Z'+(layout.ids.indexOf(p.id)+1)+' táctica':''}${p.id===preferredId?(m.integralVersion?' · principal sugerido':' · sugerido'):m.integralVersion?' · candidato adicional':''}</button>`;}).join('')}${selected.map((id,i)=>`<button class="btn btn-small" data-action="flow-blocker-primary" data-index="${index}" data-id="${esc(id)}">${esc(flowName(m,id,side))}${i===0?" · principal":" · hacer principal"}</button>`).join("")}<button class="btn" data-action="flow-blocker-clear" data-index="${index}">Sin identificar</button></div></fieldset>`;
 }
 function renderFlowExtras(m){
   if(selectedSkill==='attack')return `<details class="v2-extra"><summary>Bloqueadores · opcional</summary>${renderFlowBlockPicker(m,null,-1)}</details>`;
-  const roster=VolleyRally.roster(m,activeSide).filter(p=>VolleyRally.positions(activeSet(),activeSide).includes(p.id));
+  const roster=VolleyRally.roster(m,activeSide).filter(p=>{const pos=VolleyRally.positions(activeSet(),activeSide).indexOf(p.id)+1;return pos&&(!m.integralVersion||selectedSkill!=='block'||[2,3,4].includes(pos));});
   if(selectedSkill==='block')return `<fieldset><legend>Participantes del bloqueo</legend>${roster.filter(p=>!p.isLibero).map(p=>`<label class="row"><input type="checkbox" data-v2-blocker="${esc(p.id)}" ${p.id===selectedPlayerId||ownBlockers.includes(p.id)?'checked':''} ${p.id===selectedPlayerId?'disabled':''}>${esc(flowName(m,p.id))}</label>`).join('')}</fieldset>`;
   if(selectedSkill==='setting')return `<label>Destino del armado<select data-v2-field="settingTarget"><option value="">Sin identificar</option>${[['outside','Punta'],['middle','Central'],['opposite','Opuesto'],['backrow','Zaguero'],['other','Otro']].map(([v,l])=>`<option value="${v}" ${settingTarget===v?'selected':''}>${l}</option>`).join('')}</select></label><label>Atacante destinatario (opcional)<select data-v2-field="receiverId"><option value="">Sin identificar</option>${teamOptions(roster,receiverId)}</select></label>`;
   return '';
@@ -123,13 +125,13 @@ function handleFlowAction(action,t){
   if(action==='flow-draft-bench-remove'){setupDraft.rivalBench?.splice(+t.dataset.index,1);render();return true;}
   if(action==='court-enable'){if(!s||!betweenRallies(s))return true;if(m.rallyAutomation!==2)enableRallyFlow(m,s);m.courtAutomation=1;VolleyCourt.sync(m,s);beginRallyFlow();save();render();return true;}
   if(action==='court-resume-libero'){if(!s||!betweenRallies(s))return true;if(s.liberoManual)delete s.liberoManual[t.dataset.side];VolleyCourt.sync(m,s);beginRallyFlow();save();render();return true;}
-  if(action==='court-reset-layout'){if(s?.tacticalOverrides)delete s.tacticalOverrides[t.dataset.side];refreshTacticalInput();save();render();return true;}
+  if(action==='court-reset-layout'){if(s?.phaseOverrides?.[t.dataset.side])delete s.phaseOverrides[t.dataset.side][VolleyTactics.phase(m,s,t.dataset.side)];if(s?.tacticalOverrides)delete s.tacticalOverrides[t.dataset.side];refreshTacticalInput();save();render();return true;}
   if(action==='court-early-phases'){earlyPhasesExpanded=!earlyPhasesExpanded;render();return true;}
   if(action==='flow-enable'){if(!betweenRallies(s))return true;enableRallyFlow(m,s);beginRallyFlow();save();render();return true;}
-  if(action==='flow-stat-panel'){const valid=flowStatsView==='post'?['summary','fundamentals','attack','serve','maps','evolution','rankings']:['summary','attack','serve','players','maps'];if(valid.includes(t.dataset.panel)){if(flowStatsView==='post')flowStatsPostPanel=t.dataset.panel;else flowStatsLivePanel=t.dataset.panel;}flowStatsPlayer='';flowStatsMapPlayer='';render();return true;}
+  if(action==='flow-stat-panel'){if(m?.integralVersion&&['attack','serve'].includes(t.dataset.panel)&&flowStatsSkill!==t.dataset.panel){flowStatsSkill=t.dataset.panel;flowStatsResult='';}const valid=flowStatsView==='post'?['summary','fundamentals','attack','serve','maps','evolution','rankings']:['summary','attack','serve','players','maps'];if(valid.includes(t.dataset.panel)){if(flowStatsView==='post')flowStatsPostPanel=t.dataset.panel;else flowStatsLivePanel=t.dataset.panel;}flowStatsPlayer='';flowStatsMapPlayer='';render();return true;}
   if(action==='flow-stat-side'){if(['us','them','both'].includes(t.dataset.side))flowStatsSide=t.dataset.side;flowStatsPlayer='';flowStatsMapPlayer='';flowMapSelection='';render();return true;}
-  if(action==='flow-stat-skill'){if([...Object.keys(skills),'coverage'].includes(t.dataset.skill))flowStatsSkill=t.dataset.skill;render();return true;}
-  if(action==='flow-stat-clear'){flowStatsOrigin='';flowStatsRole='';flowStatsRotation='';flowStatsType='';flowStatsDirection='';flowStatsProvenance='';flowMapSelection='';render();return true;}
+  if(action==='flow-stat-skill'){flowStatsResult='';if([...Object.keys(skills),'coverage'].includes(t.dataset.skill))flowStatsSkill=t.dataset.skill;render();return true;}
+  if(action==='flow-stat-clear'){flowStatsResult='';flowStatsEvidence='';flowStatsOrigin='';flowStatsRole='';flowStatsRotation='';flowStatsType='';flowStatsDirection='';flowStatsProvenance='';flowMapSelection='';render();return true;}
   if(action==='flow-all-sets'){statSet='all';render();return true;}
   if(action==='flow-profile-close'){flowStatsPlayer='';flowStatsMapPlayer='';render();return true;}
   if(action==='flow-player-map'){flowStatsSide=t.dataset.side;flowStatsMapPlayer=t.dataset.player;if(flowStatsView==='live'){flowStatsPlayer='';flowStatsLivePanel='maps';}else flowStatsPlayer=t.dataset.player;render();return true;}
@@ -158,15 +160,16 @@ function handleFlowAction(action,t){
   }
   if(action==='rival-toggle'){setFlowPhase({side:'them',skill:'attack'});save();render();return true;}
   if(action==='select-player'||action==='flow-player'){
-    const editing=editingActionIndex;activeSide=t.dataset.side==='them'?'them':'us';selectedPlayerId=t.dataset.player;resetActionInputs();editingActionIndex=editing;prepareFlowInputs();save();render();return true;
+    const editing=editingActionIndex,previous=editing===null?null:pending[editing];activeSide=t.dataset.side==='them'?'them':'us';selectedPlayerId=t.dataset.player;if(typeof VolleyTactics!=='undefined')VolleyTactics.setPhase(activeMatch(),activeSet(),activeSide,selectedSkill);resetActionInputs();editingActionIndex=editing;if(previous?.skill==='block'&&selectedSkill==='block'){const group=previous.participants||[];ownBlockers=group.includes(selectedPlayerId)?group.filter(id=>id!==selectedPlayerId):group.filter(id=>id!==previous.playerId);}prepareFlowInputs();save();render();return true;
   }
-  if(action==='select-skill'){selectedSkill=t.dataset.skill;if(!skills[selectedSkill])return true;flowCoverage=false;resetActionInputs();if(selectedSkill==='serve')selectedPlayerId=VolleyRally.positions(s,activeSide)[0]||null;prepareFlowInputs();save();render();return true;}
+  if(action==='select-skill'){selectedSkill=t.dataset.skill;if(!skills[selectedSkill])return true;if(typeof VolleyTactics!=='undefined')VolleyTactics.setPhase(activeMatch(),activeSet(),activeSide,selectedSkill);flowCoverage=false;resetActionInputs();if(selectedSkill==='serve')selectedPlayerId=VolleyRally.positions(s,activeSide)[0]||null;prepareFlowInputs();save();render();return true;}
   if(action==='v2-result'){addScoutAction(t.dataset.result);return true;}
   if(['flow-origin','attack-origin','v2-zone','v2-zone-clear','select-zone'].includes(action)){
     const kind=action==='select-zone'?(['serve','attack'].includes(selectedSkill)?'destination':'origin'):t.dataset.kind||'origin';
     const z=action==='v2-zone-clear'?null:+t.dataset.zone;selectedZone=z;zonePickerOpen=false;
     if(kind==='origin'){originZone=z;flowOriginSource=z?'observed':'unknown';attackOriginManual=true;flowBlockers=[];}else {destinationZone=z;flowDestinationSource=z?'observed':'unknown';}save();render();return true;
   }
+  if(action==='flow-blocker-primary'){const a=+t.dataset.index>=0?pending[+t.dataset.index]:null,ids=a?a.metadata?.blockers:flowBlockers,index=ids?.indexOf(t.dataset.id);if(index>=0){ids.splice(index,1);ids.unshift(t.dataset.id);save();render();}return true;}
   if(action==='flow-coverage'){flowCoverage=!flowCoverage;save();render();return true;}
   if(action==='flow-blocker'||action==='flow-blocker-clear'){
     const i=+t.dataset.index,a=i>=0?pending[i]:null,ids=a?(a.metadata.blockers ||= []):flowBlockers;
@@ -176,12 +179,12 @@ function handleFlowAction(action,t){
   if(action==='v2-edit'){
     const i=+t.dataset.index,a=pending[i];if(!a||a.skill==='rival_attack')return false;
     resetActionInputs();editingActionIndex=i;activeSide=VolleyRally.side(a);selectedPlayerId=a.playerId;selectedSkill=a.skill;originZone=a.originZone;destinationZone=a.destinationZone;attackOriginManual=true;
-    serveDirectionManual=a.metadata?.serveDirectionSource==='observed'?a.metadata.serveDirection:null;attackDirection=a.metadata?.directionSource==='derived'?null:a.metadata?.attackDirection||null;attackType=a.metadata?.attackType||'conventional';attackRoleOverride=a.metadata?.attackRoleSource==='manual'?a.attackRole:'auto';flowOriginSource=a.metadata?.originSource||'observed';flowDestinationSource=['linked-defense','linked-reception'].includes(a.metadata?.destinationSource)?'unknown':a.metadata?.destinationSource||'observed';flowCoverage=a.metadata?.defenseKind==='coverage';flowBlockers=[...(a.metadata?.blockers||[])];ownBlockers=(a.participants||[]).filter(id=>id!==a.playerId);receiverId=a.metadata?.receiverId||'';render();return true;
+    serveDirectionManual=a.metadata?.serveDirectionSource==='observed'?a.metadata.serveDirection:null;attackDirection=['derived','predicted'].includes(a.metadata?.directionSource)?null:a.metadata?.attackDirection||null;attackType=a.metadata?.attackType||'conventional';attackRoleOverride=a.metadata?.attackRoleSource==='manual'?a.attackRole:'auto';flowOriginSource=a.metadata?.originSource||'observed';flowDestinationSource=['linked-defense','linked-reception'].includes(a.metadata?.destinationSource)?'unknown':a.metadata?.destinationSource||'observed';flowCoverage=a.metadata?.defenseKind==='coverage';flowBlockers=[...(a.metadata?.blockers||[])];ownBlockers=(a.participants||[]).filter(id=>id!==a.playerId);receiverId=a.metadata?.receiverId||'';render();return true;
   }
   if(['remove-draft','remove-last-draft','v2-smart-undo'].includes(action)){
     if(action==='v2-smart-undo'&&!pending.length){undoRally();return true;}
     const i=action==='remove-draft'?+t.dataset.index:pending.length-1;if(i>=0&&i<pending.length)pending.splice(i,1);
-    VolleyRally.relink(pending);awaitingBlockerIndex=null;lastActionTap=0;beginRallyFlow();save();render();return true;
+    VolleyRally.relink(pending);VolleyPrediction.apply(activeMatch(),pending);awaitingBlockerIndex=null;lastActionTap=0;beginRallyFlow();save();render();return true;
   }
   if(action==='flow-rival-add'){
     const n=(m.rivalPlayers||[]).filter(p=>p.provisional).length+1;m.rivalPlayers.push({id:uid(),number:'Rival suplente '+n,name:'',position:'',provisional:true,isLibero:false});save();render();return true;
@@ -204,6 +207,7 @@ function initializeScout() {
   state.preferences ||= {};
   if(state.activeId&&!state.matches.some(m=>m.id===state.activeId))state.activeId=state.matches[0]?.id||null;
   scoutMode=state.preferences.mode==='advanced'?'advanced':'quick';autoClosePoints=state.preferences.autoClose!==false;
+  if(typeof VolleyIntegral!=='undefined')VolleyIntegral.upgrade();
   restoreScoutDraft();
 }
 function importScoutBackup(raw) {
@@ -225,6 +229,7 @@ function importScoutBackup(raw) {
   }catch(error){toast('No se pudo resguardar o importar la copia. Los datos actuales se conservan.');return false;}
 }
 function restoreScoutDraft() {
+  if(typeof restoreIntegralEditorDraft==='function')restoreIntegralEditorDraft();
   const s=activeSet(),draft=s&&state.openRallies?.[s.id];
   resetRivalAttack();rivalDraft={...rivalDraft,...(draft?.rivalDraft||{})};rivalPanel=false;rivalTactics=false;rivalEditor='';
   pending=draft?.actions?structuredCloneSafe(draft.actions):[];
@@ -242,6 +247,7 @@ function persistScoutDraft() {
   state.openRallies[s.id]={id:openRallyId||uid(),actions:structuredCloneSafe(pending),mode:scoutMode,selectedPlayerId,selectedSkill,activeSide,earlyPhasesExpanded,serveDirectionManual,flowCoverage,flowOriginSource,flowDestinationSource,flowBlockers,
     rivalDraft:structuredCloneSafe(rivalDraft),originZone,destinationZone,pointCause,sequenceComplete,awaitingBlockerIndex,ownBlockers,settingTarget,receiverId,attackRoleOverride,attackOriginManual,attackDirection,attackDirectionSkipped,attackType,useBlockerDraft:structuredCloneSafe(useBlockerDraft)};
   state.preferences={...state.preferences,mode:scoutMode,autoClose:autoClosePoints};
+  if(typeof persistIntegralEditorDraft==='function')persistIntegralEditorDraft();
 }
 function resetActionInputs() {serveDirectionManual=null;attackOriginManual=false;attackDirection=null;attackDirectionSkipped=false;attackType='conventional';attackRoleOverride='auto';originZone=null;destinationZone=null;selectedZone=null;ownBlockers=[];settingTarget='';receiverId='';useBlockerDraft={skill:'attack',outcomeId:'use_block_out'};editingActionIndex=null;zonePickerOpen=false;}
 function scoutActionLabel(action,rally) {
@@ -340,6 +346,7 @@ function undoScoutRally() {
   awaitingBlockerIndex=null;editingActionIndex=null;lastPointCommit=0;lastActionTap=0;if(flowEnabled())beginRallyFlow();const locallySaved=save();render();toast(locallySaved?'Punto deshecho. Corregí sus acciones antes de volver a cerrarlo.':'Corrección en memoria: descargá una copia.');return true;
 }
 function handleScoutAction(action,t) {
+  if(typeof handleIntegralAction==='function'&&handleIntegralAction(action,t))return true;
   if(handleFlowAction(action,t))return true;
   if(handleRivalAction(action,t))return true;
   if(handleAttackFast(action,t))return true;

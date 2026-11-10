@@ -1,9 +1,9 @@
 'use strict';
-const APP_BUILD='2.2.1';
+const APP_BUILD='3.0.0';
 const BASE=self.registration.scope;
 const CACHE_PREFIX='volley-scout:'+new URL(BASE).pathname+':';
 const CACHE=CACHE_PREFIX+APP_BUILD;
-const VERSIONED=['training.css','training-model.js','training-store.js','training-ui.js','responsive.css','scout-v2.css','v21.css','data-compat.js','attack-position.js','volley-engine.js','stats-v2.js','coach-report.js','scout-v21.js','scout-v2.js','pwa.js','sheets-sync.js','team-management.js','saved-teams.js','blocker-tracking.js','formation-stats.js','sequence-stats.js'];
+const VERSIONED=['volley-integral.js','integral-ui.js','attack-fast.js','rival-attack.js','training.css','training-model.js','training-store.js','training-ui.js','responsive.css','scout-v2.css','v21.css','data-compat.js','attack-position.js','volley-engine.js','stats-v2.js','coach-report.js','scout-v21.js','scout-v2.js','pwa.js','sheets-sync.js','team-management.js','saved-teams.js','blocker-tracking.js','formation-stats.js','sequence-stats.js'];
 const STATIC=['manifest.webmanifest','icon-192.png','icon-512.png','apple-touch-icon.png'];
 const url=file=>new URL(file,BASE).href;
 const SHELL=[url('./'),url('index.html'),...VERSIONED.map(file=>url(file+'?v='+APP_BUILD)),...STATIC.map(url)];

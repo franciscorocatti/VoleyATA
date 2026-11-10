@@ -1,5 +1,5 @@
 'use strict';
-const APP_BUILD='2.2.0';
+const APP_BUILD='2.2.1';
 const BASE=self.registration.scope;
 const CACHE_PREFIX='volley-scout:'+new URL(BASE).pathname+':';
 const CACHE=CACHE_PREFIX+APP_BUILD;
